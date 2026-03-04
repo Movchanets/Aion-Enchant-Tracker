@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { useStore } from './store/useStore';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Dashboard } from './components/Dashboard';
+import { GlobalDashboard } from './components/GlobalDashboard';
 import { FeathersTracker } from './components/FeathersTracker';
 import { AccessoriesTracker } from './components/AccessoriesTracker';
 import { GearTracker } from './components/GearTracker';
 import { FeatherPriceCalculator } from './components/FeatherPriceCalculator';
+import { SubmitResultsButton } from './components/SubmitResultsButton';
+import { Auth } from './components/Auth';
 import { tr } from './i18n';
 import type { Tab } from './types';
 
 const TABS: { key: Tab; labelKey: Parameters<typeof tr>[1]; icon: string }[] = [
   { key: 'dashboard', labelKey: 'tabDashboard', icon: '📊' },
+  { key: 'global', labelKey: 'tabGlobal', icon: '🌍' },
   { key: 'feathers', labelKey: 'tabFeathers', icon: '🪶' },
   { key: 'accessories', labelKey: 'tabAccessories', icon: '💍' },
   { key: 'gear', labelKey: 'tabGear', icon: '⚔️' },
@@ -78,6 +82,8 @@ export default function App() {
             {tr(language, 'appTitle')}
           </h1>
           <div className="flex gap-2 flex-wrap">
+            <Auth />
+            <SubmitResultsButton />
             <div className="flex border border-aion-border rounded-lg overflow-hidden">
               <button
                 onClick={() => setLanguage('uk')}
@@ -138,6 +144,7 @@ export default function App() {
         {/* ── Content ── */}
         <main className="bg-aion-card border border-aion-border rounded-xl p-4 md:p-6">
           {activeTab === 'dashboard' && <Dashboard />}
+          {activeTab === 'global' && <GlobalDashboard />}
           {activeTab === 'feathers' && <FeathersTracker />}
           {activeTab === 'accessories' && <AccessoriesTracker />}
           {activeTab === 'gear' && <GearTracker />}
