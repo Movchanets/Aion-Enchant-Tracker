@@ -6,6 +6,7 @@ export type Language = 'uk' | 'en';
 
 export type ItemQuality = 'white' | 'green' | 'blue' | 'gold' | 'orange' | 'purple';
 export type StoneLevel = 1 | 2 | 3 | 4 | 5;
+export type SupplementTier = 'none' | 'lesser' | 'regular' | 'greater';
 
 export interface AttemptRecord {
   success: number;
@@ -25,6 +26,13 @@ export const QUALITY_META: Record<ItemQuality, { label: string; labelUk: string;
 
 export const ALL_QUALITIES: ItemQuality[] = ['white', 'green', 'blue', 'gold', 'orange', 'purple'];
 export const ALL_STONE_LEVELS: StoneLevel[] = [1, 2, 3, 4, 5];
+export const ALL_SUPPLEMENTS: SupplementTier[] = ['none', 'lesser', 'regular', 'greater'];
+export const SUPPLEMENT_BONUS: Record<SupplementTier, number> = {
+  none: 0,
+  lesser: 5,
+  regular: 10,
+  greater: 15,
+};
 
 /* ── Level caps ── */
 

@@ -31,6 +31,7 @@ create table if not exists public.gear_attempts (
   is_success boolean not null,
   item_grade text not null,
   stone_level text not null,
+  supplement text not null default 'none' check (supplement in ('none', 'lesser', 'regular', 'greater')),
   created_at timestamptz not null default now()
 );
 
@@ -40,14 +41,20 @@ alter table public.gear_attempts
 alter table public.gear_attempts
   alter column item_level drop default;
 
+alter table public.gear_attempts
+  add column if not exists supplement text not null default 'none'
+  check (supplement in ('none', 'lesser', 'regular', 'greater'));
+
 create index if not exists idx_feathers_attempts_target_level
   on public.feathers_attempts(target_level);
 
 create index if not exists idx_accessories_attempts_target_level
   on public.accessories_attempts(target_level);
 
+drop index if exists public.idx_gear_attempts_grouping;
+
 create index if not exists idx_gear_attempts_grouping
-  on public.gear_attempts(item_level, item_grade, stone_level, target_level);
+  on public.gear_attempts(item_level, item_grade, stone_level, supplement, target_level);
 
 -- ----------
 -- RLS
@@ -152,6 +159,7 @@ select
   item_level,
   item_grade,
   stone_level,
+  supplement,
   target_level,
   count(*)::bigint as total_attempts,
   count(*) filter (where is_success)::bigint as successful_attempts,
@@ -160,8 +168,8 @@ select
     2
   ) as success_rate
 from public.gear_attempts
-group by item_level, item_grade, stone_level, target_level
-order by item_level, item_grade, stone_level, target_level;
+group by item_level, item_grade, stone_level, supplement, target_level
+order by item_level, item_grade, stone_level, supplement, target_level;
 
 grant select on public.global_feathers_stats to anon, authenticated;
 grant select on public.global_accessories_stats to anon, authenticated;

@@ -4,6 +4,7 @@ import {
   type AttemptRecord,
   type ItemQuality,
   type Language,
+  type SupplementTier,
   type StoneLevel,
   type Tab,
   FEATHER_MAX,
@@ -31,6 +32,7 @@ interface GearState {
   critByItemLevel: Record<number, { successTotal: number; critTotal: number }>;
   selectedQuality: ItemQuality;
   selectedStoneLevel: StoneLevel;
+  selectedSupplement: SupplementTier;
   selectedItemLevel: number;
 }
 
@@ -57,6 +59,7 @@ interface GearUnsyncedAttempt {
   isSuccess: boolean;
   itemGrade: ItemQuality;
   stoneLevel: string;
+  supplement: SupplementTier;
   createdAt: string;
 }
 
@@ -85,12 +88,14 @@ export interface AppState {
   recordGearAttempt: (
     quality: ItemQuality,
     stoneLevel: StoneLevel,
+    supplement: SupplementTier,
     level: number,
     type: 'success' | 'fail',
     critType?: 'crit2' | 'crit3',
   ) => void;
   setGearQuality: (quality: ItemQuality) => void;
   setGearStoneLevel: (level: StoneLevel) => void;
+  setGearSupplement: (supplement: SupplementTier) => void;
   setGearItemLevel: (itemLevel: number) => void;
   clearUnsyncedQueues: () => void;
 
@@ -124,6 +129,7 @@ function initGear(): GearState {
     critByItemLevel: {},
     selectedQuality: 'gold',
     selectedStoneLevel: 1,
+    selectedSupplement: 'none',
     selectedItemLevel: 80,
   };
 }
@@ -238,7 +244,7 @@ export const useStore = create<AppState>()(
         }),
 
       /* ── Gear: failure drops level by 1, item NOT destroyed ── */
-      recordGearAttempt: (quality, stoneLevel, level, type, critType) =>
+      recordGearAttempt: (quality, stoneLevel, supplement, level, type, critType) =>
         set((state) => {
           const g = structuredClone(state.gear);
           const itemLevel = g.selectedItemLevel;
@@ -290,6 +296,7 @@ export const useStore = create<AppState>()(
                   isSuccess: type === 'success',
                   itemGrade: quality,
                   stoneLevel: String(stoneLevel),
+                  supplement,
                   createdAt: new Date().toISOString(),
                 },
               ],
@@ -299,6 +306,8 @@ export const useStore = create<AppState>()(
 
       setGearQuality: (q) => set((s) => ({ gear: { ...s.gear, selectedQuality: q } })),
       setGearStoneLevel: (l) => set((s) => ({ gear: { ...s.gear, selectedStoneLevel: l } })),
+      setGearSupplement: (supplement) =>
+        set((s) => ({ gear: { ...s.gear, selectedSupplement: supplement } })),
       setGearItemLevel: (itemLevel) =>
         set((s) => ({
           gear: {
@@ -339,6 +348,7 @@ export const useStore = create<AppState>()(
             importedGear.inventory ??= {};
             importedGear.selectedItemLevel ??= 80;
             importedGear.critByItemLevel ??= {};
+            importedGear.selectedSupplement ??= 'none';
             const legacyCrit = (d.gear as { crit?: { successTotal: number; critTotal: number } }).crit;
             if (legacyCrit && Object.keys(importedGear.critByItemLevel).length === 0) {
               importedGear.critByItemLevel[importedGear.selectedItemLevel] = legacyCrit;

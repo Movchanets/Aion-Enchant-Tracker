@@ -58,6 +58,7 @@ export function SubmitResultsButton() {
             is_success: a.isSuccess,
             item_grade: a.itemGrade,
             stone_level: a.stoneLevel,
+            supplement: a.supplement ?? 'none',
             created_at: a.createdAt,
           })),
         );

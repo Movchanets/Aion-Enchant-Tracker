@@ -3,10 +3,13 @@ import {
   GEAR_MAX,
   ALL_QUALITIES,
   ALL_STONE_LEVELS,
+  ALL_SUPPLEMENTS,
   QUALITY_META,
+  SUPPLEMENT_BONUS,
   getChance,
   getTotal,
   type ItemQuality,
+  type SupplementTier,
   type StoneLevel,
 } from '../types';
 import { tr } from '../i18n';
@@ -17,9 +20,25 @@ export function GearTracker() {
   const recordAttempt = useStore((s) => s.recordGearAttempt);
   const setQuality = useStore((s) => s.setGearQuality);
   const setStoneLevel = useStore((s) => s.setGearStoneLevel);
+  const setSupplement = useStore((s) => s.setGearSupplement);
   const setGearItemLevel = useStore((s) => s.setGearItemLevel);
 
-  const { selectedQuality, selectedStoneLevel, selectedItemLevel, stats, inventory, critByItemLevel } = gear;
+  const {
+    selectedQuality,
+    selectedStoneLevel,
+    selectedSupplement,
+    selectedItemLevel,
+    stats,
+    inventory,
+    critByItemLevel,
+  } = gear;
+
+  const supplementLabels: Record<SupplementTier, string> = {
+    none: tr(lang, 'supplementNone'),
+    lesser: tr(lang, 'supplementLesser'),
+    regular: tr(lang, 'supplementRegular'),
+    greater: tr(lang, 'supplementGreater'),
+  };
 
   const getRecord = (
     quality: ItemQuality,
@@ -50,7 +69,7 @@ export function GearTracker() {
       </div>
 
       {/* ── Selectors ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {/* Quality */}
         <div className="p-3 bg-aion-row rounded-lg border border-aion-border">
           <div className="text-xs text-aion-muted mb-2">{tr(lang, 'quality')}</div>
@@ -113,6 +132,24 @@ export function GearTracker() {
             className="w-full bg-aion-bg/70 border border-aion-border rounded px-2.5 py-1.5 outline-none focus:border-aion-gold"
           />
         </div>
+
+        <div className="p-3 bg-aion-row rounded-lg border border-aion-border">
+          <div className="text-xs text-aion-muted mb-2">{tr(lang, 'supplement')}</div>
+          <select
+            value={selectedSupplement}
+            onChange={(e) => setSupplement(e.target.value as SupplementTier)}
+            className="w-full bg-aion-bg/70 border border-aion-border rounded px-2.5 py-1.5 outline-none focus:border-aion-gold"
+          >
+            {ALL_SUPPLEMENTS.map((supplement) => (
+              <option key={supplement} value={supplement}>
+                {supplementLabels[supplement]}
+              </option>
+            ))}
+          </select>
+          <div className="mt-2 text-xs text-aion-muted">
+            {tr(lang, 'supplementBonusHint')}: <span className="text-aion-gold">+{SUPPLEMENT_BONUS[selectedSupplement]}%</span>
+          </div>
+        </div>
       </div>
 
       {/* Current filter label */}
@@ -174,7 +211,7 @@ export function GearTracker() {
                   <button
                     disabled={!hasPre}
                     onClick={() =>
-                      recordAttempt(selectedQuality, selectedStoneLevel, level, 'success')
+                      recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'success')
                     }
                     className="px-3 py-1.5 rounded border border-aion-success text-aion-success text-sm bg-aion-success/10 hover:bg-aion-success/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
                   >
@@ -183,7 +220,7 @@ export function GearTracker() {
                   <button
                     disabled={!hasPre}
                     onClick={() =>
-                      recordAttempt(selectedQuality, selectedStoneLevel, level, 'fail')
+                      recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'fail')
                     }
                     className="px-3 py-1.5 rounded border border-aion-danger text-aion-danger text-sm bg-aion-danger/10 hover:bg-aion-danger/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
                   >
@@ -200,7 +237,7 @@ export function GearTracker() {
                     <button
                       disabled={!hasPre || !critEnabled}
                       onClick={() =>
-                        recordAttempt(selectedQuality, selectedStoneLevel, level, 'success', 'crit2')
+                          recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'success', 'crit2')
                       }
                       className="px-3 py-1 rounded border border-blue-400 text-blue-300 text-xs bg-blue-400/10 hover:bg-blue-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
                     >
@@ -209,7 +246,7 @@ export function GearTracker() {
                     <button
                       disabled={!hasPre || !critEnabled}
                       onClick={() =>
-                        recordAttempt(selectedQuality, selectedStoneLevel, level, 'success', 'crit3')
+                          recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'success', 'crit3')
                       }
                       className="px-3 py-1 rounded border border-purple-400 text-purple-300 text-xs bg-purple-400/10 hover:bg-purple-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
                     >
