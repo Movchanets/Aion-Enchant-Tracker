@@ -101,12 +101,12 @@ export function GearTracker() {
         {/* Stone Level */}
         <div className="p-3 bg-aion-row rounded-lg border border-aion-border">
           <div className="text-xs text-aion-muted mb-2">{tr(lang, 'stoneLevel')}</div>
-          <div className="flex gap-1.5">
+          <div className="grid grid-cols-5 gap-1.5">
             {ALL_STONE_LEVELS.map((sl) => (
               <button
                 key={sl}
                 onClick={() => setStoneLevel(sl)}
-                className={`px-3 py-1 rounded text-sm font-medium border transition ${
+                className={`w-full px-2 py-1 rounded text-sm font-medium border transition ${
                   selectedStoneLevel === sl
                     ? 'border-aion-gold text-aion-gold bg-aion-gold/15'
                     : 'border-aion-border text-aion-muted hover:bg-white/5'
