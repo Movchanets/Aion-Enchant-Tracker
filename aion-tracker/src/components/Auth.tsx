@@ -36,7 +36,7 @@ export function Auth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo:`${window.location.origin}/Aion-Enchant-Tracker/`,
       },
     });
 
