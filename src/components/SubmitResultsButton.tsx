@@ -22,6 +22,13 @@ export function SubmitResultsButton() {
       return;
     }
 
+    const discordName =
+      (user.user_metadata?.full_name as string | undefined) ||
+      (user.user_metadata?.name as string | undefined) ||
+      (user.user_metadata?.preferred_username as string | undefined) ||
+      user.email ||
+      null;
+
     setSyncing(true);
 
     try {
@@ -29,6 +36,7 @@ export function SubmitResultsButton() {
         const { error } = await supabase.from('feathers_attempts').insert(
           unsynced.feathers.map((a) => ({
             user_id: user.id,
+            discord_name: discordName,
             target_level: a.targetLevel,
             is_success: a.isSuccess,
             created_at: a.createdAt,
@@ -41,6 +49,7 @@ export function SubmitResultsButton() {
         const { error } = await supabase.from('accessories_attempts').insert(
           unsynced.accessories.map((a) => ({
             user_id: user.id,
+            discord_name: discordName,
             target_level: a.targetLevel,
             is_success: a.isSuccess,
             created_at: a.createdAt,
@@ -53,6 +62,7 @@ export function SubmitResultsButton() {
         const { error } = await supabase.from('gear_attempts').insert(
           unsynced.gear.map((a) => ({
             user_id: user.id,
+            discord_name: discordName,
             item_level: a.itemLevel ?? 1,
             target_level: a.targetLevel,
             is_success: a.isSuccess,

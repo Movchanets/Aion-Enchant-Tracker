@@ -130,7 +130,7 @@ function initGear(): GearState {
     selectedQuality: 'gold',
     selectedStoneLevel: 1,
     selectedSupplement: 'none',
-    selectedItemLevel: 80,
+    selectedItemLevel: 65,
   };
 }
 

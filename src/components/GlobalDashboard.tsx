@@ -34,6 +34,11 @@ type RawGearAttempt = RawAttempt & {
   supplement: SupplementTier | null;
 };
 
+type UserIdentityRow = {
+  user_id: string;
+  discord_name: string | null;
+};
+
 function normalizeSupplement(supplement: SupplementTier | null | undefined): SupplementTier {
   if (!supplement) return 'none';
   if (supplement === 'lesser' || supplement === 'regular' || supplement === 'greater') return supplement;
@@ -118,14 +123,65 @@ export function GlobalDashboard() {
   const [feathers, setFeathers] = useState<GlobalRow[]>([]);
   const [accessories, setAccessories] = useState<GlobalRow[]>([]);
   const [gear, setGear] = useState<GlobalGearRow[]>([]);
-  const [userScope, setUserScope] = useState<'all' | 'current' | 'custom'>('all');
-  const [customUserId, setCustomUserId] = useState('');
+  const [userScope, setUserScope] = useState<'all' | 'current' | 'nickname'>('all');
+  const [availableUsers, setAvailableUsers] = useState<UserIdentityRow[]>([]);
+  const [selectedNicknameUserId, setSelectedNicknameUserId] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedGearItemLevel, setSelectedGearItemLevel] = useState<number>(65);
   const [selectedGearGrade, setSelectedGearGrade] = useState<ItemQuality>('purple');
   const [selectedGearStoneLevel, setSelectedGearStoneLevel] = useState<string>('1');
   const [selectedGearSupplement, setSelectedGearSupplement] = useState<SupplementTier | 'all'>('all');
   const [selectedGearEnchantLevel, setSelectedGearEnchantLevel] = useState<number | 'all'>('all');
+
+  const fetchUsers = async () => {
+    const [feathersUsersRes, accessoriesUsersRes, gearUsersRes] = await Promise.all([
+      supabase.from('feathers_attempts').select('user_id,discord_name').order('created_at', { ascending: false }),
+      supabase.from('accessories_attempts').select('user_id,discord_name').order('created_at', { ascending: false }),
+      supabase.from('gear_attempts').select('user_id,discord_name').order('created_at', { ascending: false }),
+    ]);
+
+    if (feathersUsersRes.error || accessoriesUsersRes.error || gearUsersRes.error) {
+      setError(
+        feathersUsersRes.error?.message ||
+          accessoriesUsersRes.error?.message ||
+          gearUsersRes.error?.message ||
+          'Failed to load users list.',
+      );
+      return;
+    }
+
+    const map = new Map<string, UserIdentityRow>();
+    const allRows = [
+      ...((feathersUsersRes.data ?? []) as UserIdentityRow[]),
+      ...((accessoriesUsersRes.data ?? []) as UserIdentityRow[]),
+      ...((gearUsersRes.data ?? []) as UserIdentityRow[]),
+    ];
+
+    for (const row of allRows) {
+      const existing = map.get(row.user_id);
+      if (!existing) {
+        map.set(row.user_id, row);
+        continue;
+      }
+      if (!existing.discord_name && row.discord_name) {
+        map.set(row.user_id, row);
+      }
+    }
+
+    const users = Array.from(map.values()).sort((a, b) => {
+      const nameA = (a.discord_name ?? '').toLowerCase();
+      const nameB = (b.discord_name ?? '').toLowerCase();
+      if (nameA && nameB) return nameA.localeCompare(nameB);
+      if (nameA) return -1;
+      if (nameB) return 1;
+      return a.user_id.localeCompare(b.user_id);
+    });
+
+    setAvailableUsers(users);
+    if (!selectedNicknameUserId && users.length > 0) {
+      setSelectedNicknameUserId(users[0].user_id);
+    }
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -141,7 +197,7 @@ export function GlobalDashboard() {
         ? null
         : userScope === 'current'
           ? (user?.id ?? null)
-          : (customUserId.trim() || null);
+          : (selectedNicknameUserId || null);
 
     if (userScope !== 'all' && !selectedUserId) {
       setError('Select a valid user for personal stats.');
@@ -299,8 +355,22 @@ export function GlobalDashboard() {
   ]);
 
   useEffect(() => {
-    void fetchStats();
+    void fetchUsers();
   }, []);
+
+  useEffect(() => {
+    void fetchStats();
+  }, [userScope, selectedNicknameUserId]);
+
+  const selectedNicknameUser = useMemo(
+    () => availableUsers.find((u) => u.user_id === selectedNicknameUserId) ?? null,
+    [availableUsers, selectedNicknameUserId],
+  );
+
+  const formatUserLabel = (user: UserIdentityRow): string => {
+    const shortId = user.user_id.slice(0, 8);
+    return user.discord_name ? `${user.discord_name} (${shortId}...)` : `Unknown (${shortId}...)`;
+  };
 
   return (
     <div className="space-y-6">
@@ -317,38 +387,52 @@ export function GlobalDashboard() {
       {loading && <p className="text-sm text-aion-muted">Loading community stats...</p>}
       {error && <p className="text-sm text-aion-danger">{error}</p>}
 
-      <section className="bg-aion-row border border-aion-border rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-aion-gold mb-3">Data Scope</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <section className="bg-aion-row border border-aion-border rounded-lg p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-aion-gold">Data Scope</h3>
+          <span className="text-xs text-aion-muted">Filter global stats by user</span>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <label className="text-xs text-aion-muted">
             Scope
             <select
               value={userScope}
-              onChange={(e) => setUserScope(e.target.value as 'all' | 'current' | 'custom')}
+              onChange={(e) => setUserScope(e.target.value as 'all' | 'current' | 'nickname')}
               className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
             >
               <option value="all">All users</option>
               <option value="current">Current user</option>
-              <option value="custom">Specific user ID</option>
+              <option value="nickname">Discord nickname</option>
             </select>
           </label>
 
-          {userScope === 'custom' && (
-            <label className="text-xs text-aion-muted md:col-span-2">
-              User ID
-              <input
-                type="text"
-                value={customUserId}
-                onChange={(e) => setCustomUserId(e.target.value)}
-                placeholder="UUID from auth.users"
+          {userScope === 'nickname' && (
+            <label className="text-xs text-aion-muted">
+              Discord user
+              <select
+                value={selectedNicknameUserId}
+                onChange={(e) => setSelectedNicknameUserId(e.target.value)}
                 className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
-              />
+              >
+                {availableUsers.length === 0 && <option value="">No users found</option>}
+                {availableUsers.map((u) => (
+                  <option key={u.user_id} value={u.user_id}>
+                    {formatUserLabel(u)}
+                  </option>
+                ))}
+              </select>
             </label>
           )}
 
           {userScope === 'current' && (
-            <div className="text-xs text-aion-muted md:col-span-2 self-end">
+            <div className="text-xs text-aion-muted self-end">
               Current user ID: <span className="text-aion-text">{currentUserId ?? 'Not logged in'}</span>
+            </div>
+          )}
+
+          {userScope === 'nickname' && selectedNicknameUser && (
+            <div className="text-xs text-aion-muted self-end">
+              Selected: <span className="text-aion-text">{formatUserLabel(selectedNicknameUser)}</span>
             </div>
           )}
         </div>

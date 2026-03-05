@@ -10,6 +10,7 @@ begin;
 create table if not exists public.feathers_attempts (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
+  discord_name text,
   target_level integer not null check (target_level >= 1),
   is_success boolean not null,
   created_at timestamptz not null default now()
@@ -18,6 +19,7 @@ create table if not exists public.feathers_attempts (
 create table if not exists public.accessories_attempts (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
+  discord_name text,
   target_level integer not null check (target_level >= 1),
   is_success boolean not null,
   created_at timestamptz not null default now()
@@ -26,6 +28,7 @@ create table if not exists public.accessories_attempts (
 create table if not exists public.gear_attempts (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
+  discord_name text,
   item_level integer not null check (item_level >= 1),
   target_level integer not null check (target_level >= 1),
   is_success boolean not null,
@@ -40,6 +43,15 @@ alter table public.gear_attempts
 
 alter table public.gear_attempts
   alter column item_level drop default;
+
+alter table public.feathers_attempts
+  add column if not exists discord_name text;
+
+alter table public.accessories_attempts
+  add column if not exists discord_name text;
+
+alter table public.gear_attempts
+  add column if not exists discord_name text;
 
 alter table public.gear_attempts
   add column if not exists supplement text not null default 'none'
