@@ -1,6 +1,6 @@
 /* ── Shared types & constants ── */
 
-export type Tab = 'dashboard' | 'feathers' | 'accessories' | 'gear' | 'calculator';
+export type Tab = 'dashboard' | 'global' | 'feathers' | 'accessories' | 'gear' | 'calculator';
 
 export type Language = 'uk' | 'en';
 

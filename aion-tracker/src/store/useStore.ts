@@ -39,6 +39,32 @@ interface GearAttemptRecord {
   fail: number;
 }
 
+interface FeatherUnsyncedAttempt {
+  targetLevel: number;
+  isSuccess: boolean;
+  createdAt: string;
+}
+
+interface AccessoryUnsyncedAttempt {
+  targetLevel: number;
+  isSuccess: boolean;
+  createdAt: string;
+}
+
+interface GearUnsyncedAttempt {
+  targetLevel: number;
+  isSuccess: boolean;
+  itemGrade: ItemQuality;
+  stoneLevel: string;
+  createdAt: string;
+}
+
+interface UnsyncedAttemptsState {
+  feathers: FeatherUnsyncedAttempt[];
+  accessories: AccessoryUnsyncedAttempt[];
+  gear: GearUnsyncedAttempt[];
+}
+
 /* ── Full store interface ── */
 
 export interface AppState {
@@ -47,6 +73,7 @@ export interface AppState {
   feathers: FeatherState;
   accessories: AccessoryState;
   gear: GearState;
+  unsyncedAttempts: UnsyncedAttemptsState;
 
   setActiveTab: (tab: Tab) => void;
   setLanguage: (language: Language) => void;
@@ -64,6 +91,7 @@ export interface AppState {
   setGearQuality: (quality: ItemQuality) => void;
   setGearStoneLevel: (level: StoneLevel) => void;
   setGearItemLevel: (itemLevel: number) => void;
+  clearUnsyncedQueues: () => void;
 
   resetAll: () => void;
   getExportData: () => object;
@@ -96,6 +124,14 @@ function initGear(): GearState {
     selectedQuality: 'gold',
     selectedStoneLevel: 1,
     selectedItemLevel: 80,
+  };
+}
+
+function initUnsyncedAttempts(): UnsyncedAttemptsState {
+  return {
+    feathers: [],
+    accessories: [],
+    gear: [],
   };
 }
 
@@ -143,6 +179,7 @@ export const useStore = create<AppState>()(
       feathers: initFeathers(),
       accessories: initAccessories(),
       gear: initGear(),
+      unsyncedAttempts: initUnsyncedAttempts(),
 
       setActiveTab: (tab) => set({ activeTab: tab }),
       setLanguage: (language) => set({ language }),
@@ -156,7 +193,21 @@ export const useStore = create<AppState>()(
           if (targetLevel > 1) f.inventory[targetLevel - 1]--;
           f.stats[targetLevel][type]++;
           if (type === 'success') f.inventory[targetLevel]++;
-          return { feathers: f };
+
+          return {
+            feathers: f,
+            unsyncedAttempts: {
+              ...state.unsyncedAttempts,
+              feathers: [
+                ...state.unsyncedAttempts.feathers,
+                {
+                  targetLevel,
+                  isSuccess: type === 'success',
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            },
+          };
         }),
 
       /* ── Accessories: configurable fail behaviour ── */
@@ -168,7 +219,21 @@ export const useStore = create<AppState>()(
           a.stats[targetLevel][type]++;
           if (type === 'success') a.inventory[targetLevel]++;
           if (type === 'fail') a.inventory[0]++;
-          return { accessories: a };
+
+          return {
+            accessories: a,
+            unsyncedAttempts: {
+              ...state.unsyncedAttempts,
+              accessories: [
+                ...state.unsyncedAttempts.accessories,
+                {
+                  targetLevel,
+                  isSuccess: type === 'success',
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            },
+          };
         }),
 
       /* ── Gear: failure drops level by 1, item NOT destroyed ── */
@@ -212,7 +277,22 @@ export const useStore = create<AppState>()(
             ensureGearCritByItemLevelPath(g.critByItemLevel, itemLevel).critTotal++;
           }
 
-          return { gear: g };
+          return {
+            gear: g,
+            unsyncedAttempts: {
+              ...state.unsyncedAttempts,
+              gear: [
+                ...state.unsyncedAttempts.gear,
+                {
+                  targetLevel: level,
+                  isSuccess: type === 'success',
+                  itemGrade: quality,
+                  stoneLevel: String(stoneLevel),
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            },
+          };
         }),
 
       setGearQuality: (q) => set((s) => ({ gear: { ...s.gear, selectedQuality: q } })),
@@ -225,13 +305,27 @@ export const useStore = create<AppState>()(
           },
         })),
 
+      clearUnsyncedQueues: () => set({ unsyncedAttempts: initUnsyncedAttempts() }),
+
       /* ── Global actions ── */
       resetAll: () =>
-        set({ feathers: initFeathers(), accessories: initAccessories(), gear: initGear() }),
+        set({
+          feathers: initFeathers(),
+          accessories: initAccessories(),
+          gear: initGear(),
+          unsyncedAttempts: initUnsyncedAttempts(),
+        }),
 
       getExportData: () => {
-        const { feathers, accessories, gear } = get();
-        return { version: 1, exportedAt: new Date().toISOString(), feathers, accessories, gear };
+        const { feathers, accessories, gear, unsyncedAttempts } = get();
+        return {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          feathers,
+          accessories,
+          gear,
+          unsyncedAttempts,
+        };
       },
 
       importData: (raw) => {
@@ -251,6 +345,7 @@ export const useStore = create<AppState>()(
               feathers: d.feathers as FeatherState,
               accessories: d.accessories as AccessoryState,
               gear: importedGear,
+              unsyncedAttempts: (d.unsyncedAttempts as UnsyncedAttemptsState) ?? initUnsyncedAttempts(),
             });
             return true;
           }
@@ -261,7 +356,7 @@ export const useStore = create<AppState>()(
             const inv = d.inventory as Record<string, number>;
             for (const k of Object.keys(stats)) f.stats[Number(k)] = stats[k];
             for (const k of Object.keys(inv)) f.inventory[Number(k)] = inv[k];
-            set({ feathers: f });
+            set({ feathers: f, unsyncedAttempts: initUnsyncedAttempts() });
             return true;
           }
           return false;
