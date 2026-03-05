@@ -40,8 +40,8 @@ const DICT: Dict = {
 
   gearTitle: { uk: 'Екіпірування', en: 'Gear' },
   gearHint: {
-    uk: 'При невдачі рівень заточки знижується на 1 (предмет не знищується).',
-    en: 'On fail, enchant level drops by 1 (item is not destroyed).',
+    uk: 'При невдачі рівень заточки знижується на 1. з +11 до +15 заточка падає до +10.',
+    en: 'On fail, enchant level drops by 1. From +11 to +15, enchantment level drops to +10.',
   },
   quality: { uk: 'Якість предмета', en: 'Item quality' },
   stoneLevel: { uk: 'Рівень каменю заточки', en: 'Enchantment stone level' },

@@ -104,8 +104,12 @@ export function GearTracker() {
           <input
             type="number"
             min={1}
+            max={65}
             value={selectedItemLevel}
-            onChange={(e) => setGearItemLevel(Number(e.target.value) || 1)}
+            onChange={(e) => {
+              const val = Number(e.target.value) || 1;
+              setGearItemLevel(Math.min(65, Math.max(1, val)));
+            }}
             className="w-full bg-aion-bg/70 border border-aion-border rounded px-2.5 py-1.5 outline-none focus:border-aion-gold"
           />
         </div>
