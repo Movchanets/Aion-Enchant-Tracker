@@ -53,6 +53,7 @@ export function SubmitResultsButton() {
         const { error } = await supabase.from('gear_attempts').insert(
           unsynced.gear.map((a) => ({
             user_id: user.id,
+            item_level: a.itemLevel ?? 1,
             target_level: a.targetLevel,
             is_success: a.isSuccess,
             item_grade: a.itemGrade,

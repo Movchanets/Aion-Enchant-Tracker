@@ -3,7 +3,7 @@ import type { Language } from './types';
 type Dict = Record<string, { uk: string; en: string }>;
 
 const DICT: Dict = {
-  appTitle: { uk: 'Aion: Трекер заточки', en: 'Aion: Enchant Tracker' },
+  appTitle: { uk: 'Riftshade: Трекер заточки ', en: 'Riftshade: Enchant Tracker' },
   export: { uk: 'Експорт', en: 'Export' },
   import: { uk: 'Імпорт', en: 'Import' },
   reset: { uk: 'Скинути', en: 'Reset' },

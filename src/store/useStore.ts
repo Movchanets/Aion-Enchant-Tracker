@@ -52,6 +52,7 @@ interface AccessoryUnsyncedAttempt {
 }
 
 interface GearUnsyncedAttempt {
+  itemLevel: number;
   targetLevel: number;
   isSuccess: boolean;
   itemGrade: ItemQuality;
@@ -284,6 +285,7 @@ export const useStore = create<AppState>()(
               gear: [
                 ...state.unsyncedAttempts.gear,
                 {
+                  itemLevel,
                   targetLevel: level,
                   isSuccess: type === 'success',
                   itemGrade: quality,

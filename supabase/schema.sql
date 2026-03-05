@@ -26,12 +26,19 @@ create table if not exists public.accessories_attempts (
 create table if not exists public.gear_attempts (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
+  item_level integer not null check (item_level >= 1),
   target_level integer not null check (target_level >= 1),
   is_success boolean not null,
   item_grade text not null,
   stone_level text not null,
   created_at timestamptz not null default now()
 );
+
+alter table public.gear_attempts
+  add column if not exists item_level integer not null default 1;
+
+alter table public.gear_attempts
+  alter column item_level drop default;
 
 create index if not exists idx_feathers_attempts_target_level
   on public.feathers_attempts(target_level);
@@ -40,7 +47,7 @@ create index if not exists idx_accessories_attempts_target_level
   on public.accessories_attempts(target_level);
 
 create index if not exists idx_gear_attempts_grouping
-  on public.gear_attempts(item_grade, stone_level, target_level);
+  on public.gear_attempts(item_level, item_grade, stone_level, target_level);
 
 -- ----------
 -- RLS
@@ -142,6 +149,7 @@ order by target_level;
 
 create or replace view public.global_gear_stats as
 select
+  item_level,
   item_grade,
   stone_level,
   target_level,
@@ -152,8 +160,8 @@ select
     2
   ) as success_rate
 from public.gear_attempts
-group by item_grade, stone_level, target_level
-order by item_grade, stone_level, target_level;
+group by item_level, item_grade, stone_level, target_level
+order by item_level, item_grade, stone_level, target_level;
 
 grant select on public.global_feathers_stats to anon, authenticated;
 grant select on public.global_accessories_stats to anon, authenticated;

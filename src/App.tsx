@@ -77,11 +77,11 @@ export default function App() {
     <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-5xl mx-auto">
         {/* ── Header ── */}
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-aion-gold tracking-tight">
+        <header className="mb-6 space-y-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-aion-gold tracking-tight break-words">
             {tr(language, 'appTitle')}
           </h1>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex w-full flex-wrap items-center gap-2">
             <Auth />
             <SubmitResultsButton />
             <div className="flex border border-aion-border rounded-lg overflow-hidden">
@@ -116,7 +116,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setShowReset(true)}
-              className="px-3 py-1.5 rounded-lg border border-aion-danger text-aion-danger text-sm hover:bg-aion-danger/10 transition"
+              className="px-3 py-1.5 rounded-lg border border-aion-danger text-aion-danger text-sm whitespace-nowrap hover:bg-aion-danger/10 transition"
             >
               🗑️ {tr(language, 'reset')}
             </button>

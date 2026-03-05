@@ -60,7 +60,7 @@ export function Auth() {
     return (
       <button
         onClick={handleDiscordLogin}
-        className="px-3 py-1.5 rounded-lg border border-indigo-400 text-indigo-300 text-sm hover:bg-indigo-400/15 transition"
+        className="px-3 py-1.5 rounded-lg border border-indigo-400 text-indigo-300 text-sm whitespace-nowrap hover:bg-indigo-400/15 transition"
       >
         Login with Discord
       </button>
@@ -79,7 +79,7 @@ export function Auth() {
     (user.user_metadata?.picture as string | undefined);
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-aion-border bg-aion-row px-2 py-1.5">
+    <div className="max-w-full min-w-0 flex items-center gap-2 rounded-lg border border-aion-border bg-aion-row px-2 py-1.5">
       {avatarUrl ? (
         <img src={avatarUrl} alt={discordName} className="w-7 h-7 rounded-full border border-aion-border" />
       ) : (
@@ -87,11 +87,11 @@ export function Auth() {
       )}
       <div className="text-xs leading-tight">
         <div className="text-aion-muted">Logged in</div>
-        <div className="font-semibold text-aion-text max-w-[130px] truncate">{discordName}</div>
+        <div className="font-semibold text-aion-text max-w-[90px] sm:max-w-[130px] truncate">{discordName}</div>
       </div>
       <button
         onClick={handleLogout}
-        className="ml-1 px-2 py-1 rounded border border-aion-border text-aion-muted text-xs hover:bg-white/5 transition"
+        className="ml-1 px-2 py-1 rounded border border-aion-border text-aion-muted text-xs whitespace-nowrap hover:bg-white/5 transition"
       >
         Logout
       </button>
