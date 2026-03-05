@@ -176,7 +176,7 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       activeTab: 'dashboard',
-      language: 'uk',
+      language: 'en',
       feathers: initFeathers(),
       accessories: initAccessories(),
       gear: initGear(),
