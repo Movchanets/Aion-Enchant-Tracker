@@ -25,6 +25,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Create environment file from secrets
+        run: |
+          cat <<'EOF' > .env
+          VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          EOF
       - run: npm ci
       - run: npm run build
 
