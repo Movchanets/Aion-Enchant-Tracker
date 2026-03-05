@@ -36,6 +36,7 @@ type RawGearAttempt = RawAttempt & {
 
 type UserIdentityRow = {
   user_id: string;
+  NickName: string | null;
   discord_name: string | null;
 };
 
@@ -135,9 +136,9 @@ export function GlobalDashboard() {
 
   const fetchUsers = async () => {
     const [feathersUsersRes, accessoriesUsersRes, gearUsersRes] = await Promise.all([
-      supabase.from('feathers_attempts').select('user_id,discord_name').order('created_at', { ascending: false }),
-      supabase.from('accessories_attempts').select('user_id,discord_name').order('created_at', { ascending: false }),
-      supabase.from('gear_attempts').select('user_id,discord_name').order('created_at', { ascending: false }),
+      supabase.from('feathers_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
+      supabase.from('accessories_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
+      supabase.from('gear_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
     ]);
 
     if (feathersUsersRes.error || accessoriesUsersRes.error || gearUsersRes.error) {
@@ -163,14 +164,18 @@ export function GlobalDashboard() {
         map.set(row.user_id, row);
         continue;
       }
+      if (!existing.NickName && row.NickName) {
+        map.set(row.user_id, row);
+        continue;
+      }
       if (!existing.discord_name && row.discord_name) {
         map.set(row.user_id, row);
       }
     }
 
     const users = Array.from(map.values()).sort((a, b) => {
-      const nameA = (a.discord_name ?? '').toLowerCase();
-      const nameB = (b.discord_name ?? '').toLowerCase();
+      const nameA = (a.NickName ?? a.discord_name ?? '').toLowerCase();
+      const nameB = (b.NickName ?? b.discord_name ?? '').toLowerCase();
       if (nameA && nameB) return nameA.localeCompare(nameB);
       if (nameA) return -1;
       if (nameB) return 1;
@@ -209,15 +214,15 @@ export function GlobalDashboard() {
       const [feathersRawRes, accessoriesRawRes, gearRawRes] = await Promise.all([
         supabase
           .from('feathers_attempts')
-          .select('target_level,is_success')
+          .select('target_level,is_success,NickName:nickname')
           .eq('user_id', selectedUserId),
         supabase
           .from('accessories_attempts')
-          .select('target_level,is_success')
+          .select('target_level,is_success,NickName:nickname')
           .eq('user_id', selectedUserId),
         supabase
           .from('gear_attempts')
-          .select('item_level,item_grade,stone_level,target_level,is_success,supplement')
+          .select('item_level,item_grade,stone_level,target_level,is_success,supplement,NickName:nickname')
           .eq('user_id', selectedUserId),
       ]);
 
@@ -369,7 +374,8 @@ export function GlobalDashboard() {
 
   const formatUserLabel = (user: UserIdentityRow): string => {
     const shortId = user.user_id.slice(0, 8);
-    return user.discord_name ? `${user.discord_name} (${shortId}...)` : `Unknown (${shortId}...)`;
+    const displayName = user.NickName ?? user.discord_name;
+    return displayName ? `${displayName} (${shortId}...)` : `Unknown (${shortId}...)`;
   };
 
   return (
