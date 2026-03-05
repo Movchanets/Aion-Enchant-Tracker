@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 
 export function SubmitResultsButton() {
   const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
   const unsynced = useStore((s) => s.unsyncedAttempts);
   const clearUnsyncedQueues = useStore((s) => s.clearUnsyncedQueues);
 
@@ -80,6 +82,13 @@ export function SubmitResultsButton() {
       }
 
       clearUnsyncedQueues();
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['globalFeathersStats'] }),
+        queryClient.invalidateQueries({ queryKey: ['globalAccessoriesStats'] }),
+        queryClient.invalidateQueries({ queryKey: ['globalGearStats'] }),
+      ]);
+
       alert('Results synced successfully.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync data.';

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import {
   ALL_STONE_LEVELS,
@@ -59,6 +60,7 @@ function aggregateSimpleRows(rows: RawAttempt[]): GlobalRow[] {
     if (row.is_success) acc.success += 1;
     byTarget.set(row.target_level, acc);
   }
+
   return Array.from(byTarget.entries())
     .map(([target_level, acc]) => ({
       target_level,
@@ -70,7 +72,15 @@ function aggregateSimpleRows(rows: RawAttempt[]): GlobalRow[] {
 }
 
 function aggregateGearRows(rows: RawGearAttempt[]): GlobalGearRow[] {
-  const byKey = new Map<string, { total: number; success: number; row: Omit<GlobalGearRow, 'total_attempts' | 'successful_attempts' | 'success_rate'> }>();
+  const byKey = new Map<
+    string,
+    {
+      total: number;
+      success: number;
+      row: Omit<GlobalGearRow, 'total_attempts' | 'successful_attempts' | 'success_rate'>;
+    }
+  >();
+
   for (const row of rows) {
     const supplement = normalizeSupplement(row.supplement);
     const key = [row.item_level, row.item_grade, row.stone_level, supplement, row.target_level].join('|');
@@ -97,13 +107,119 @@ function aggregateGearRows(rows: RawGearAttempt[]): GlobalGearRow[] {
       successful_attempts: success,
       success_rate: toRate(success, total),
     }))
-    .sort((a, b) =>
-      a.item_level - b.item_level ||
-      a.item_grade.localeCompare(b.item_grade) ||
-      String(a.stone_level).localeCompare(String(b.stone_level)) ||
-      ALL_SUPPLEMENTS.indexOf(a.supplement) - ALL_SUPPLEMENTS.indexOf(b.supplement) ||
-      a.target_level - b.target_level,
+    .sort(
+      (a, b) =>
+        a.item_level - b.item_level ||
+        a.item_grade.localeCompare(b.item_grade) ||
+        String(a.stone_level).localeCompare(String(b.stone_level)) ||
+        ALL_SUPPLEMENTS.indexOf(a.supplement) - ALL_SUPPLEMENTS.indexOf(b.supplement) ||
+        a.target_level - b.target_level,
     );
+}
+
+async function fetchCurrentUserId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+async function fetchAvailableUsers(): Promise<UserIdentityRow[]> {
+  const [feathersUsersRes, accessoriesUsersRes, gearUsersRes] = await Promise.all([
+    supabase.from('feathers_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
+    supabase.from('accessories_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
+    supabase.from('gear_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
+  ]);
+
+  if (feathersUsersRes.error || accessoriesUsersRes.error || gearUsersRes.error) {
+    throw new Error(
+      feathersUsersRes.error?.message || accessoriesUsersRes.error?.message || gearUsersRes.error?.message || 'Failed to load users list.',
+    );
+  }
+
+  const map = new Map<string, UserIdentityRow>();
+  const allRows = [
+    ...((feathersUsersRes.data ?? []) as UserIdentityRow[]),
+    ...((accessoriesUsersRes.data ?? []) as UserIdentityRow[]),
+    ...((gearUsersRes.data ?? []) as UserIdentityRow[]),
+  ];
+
+  for (const row of allRows) {
+    const existing = map.get(row.user_id);
+    if (!existing) {
+      map.set(row.user_id, row);
+      continue;
+    }
+
+    if (!existing.NickName && row.NickName) {
+      map.set(row.user_id, row);
+      continue;
+    }
+
+    if (!existing.discord_name && row.discord_name) {
+      map.set(row.user_id, row);
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const nameA = (a.NickName ?? a.discord_name ?? '').toLowerCase();
+    const nameB = (b.NickName ?? b.discord_name ?? '').toLowerCase();
+    if (nameA && nameB) return nameA.localeCompare(nameB);
+    if (nameA) return -1;
+    if (nameB) return 1;
+    return a.user_id.localeCompare(b.user_id);
+  });
+}
+
+async function fetchGlobalFeathersStats(): Promise<GlobalRow[]> {
+  const res = await supabase.from('global_feathers_stats').select('*').order('target_level', { ascending: true });
+  if (res.error) throw new Error(res.error.message);
+  return (res.data ?? []) as GlobalRow[];
+}
+
+async function fetchGlobalAccessoriesStats(): Promise<GlobalRow[]> {
+  const res = await supabase.from('global_accessories_stats').select('*').order('target_level', { ascending: true });
+  if (res.error) throw new Error(res.error.message);
+  return (res.data ?? []) as GlobalRow[];
+}
+
+async function fetchGlobalGearStats(): Promise<GlobalGearRow[]> {
+  const res = await supabase
+    .from('global_gear_stats')
+    .select('*')
+    .order('item_level', { ascending: true })
+    .order('item_grade', { ascending: true })
+    .order('stone_level', { ascending: true })
+    .order('supplement', { ascending: true })
+    .order('target_level', { ascending: true });
+
+  if (res.error) throw new Error(res.error.message);
+
+  return ((res.data ?? []) as Array<GlobalGearRow & { supplement?: SupplementTier | null }>).map((row) => ({
+    ...row,
+    supplement: normalizeSupplement(row.supplement),
+  }));
+}
+
+async function fetchUserFeathersStats(userId: string): Promise<GlobalRow[]> {
+  const res = await supabase.from('feathers_attempts').select('target_level,is_success').eq('user_id', userId);
+  if (res.error) throw new Error(res.error.message);
+  return aggregateSimpleRows((res.data ?? []) as RawAttempt[]);
+}
+
+async function fetchUserAccessoriesStats(userId: string): Promise<GlobalRow[]> {
+  const res = await supabase.from('accessories_attempts').select('target_level,is_success').eq('user_id', userId);
+  if (res.error) throw new Error(res.error.message);
+  return aggregateSimpleRows((res.data ?? []) as RawAttempt[]);
+}
+
+async function fetchUserGearStats(userId: string): Promise<GlobalGearRow[]> {
+  const res = await supabase
+    .from('gear_attempts')
+    .select('item_level,item_grade,stone_level,target_level,is_success,supplement')
+    .eq('user_id', userId);
+  if (res.error) throw new Error(res.error.message);
+  return aggregateGearRows((res.data ?? []) as RawGearAttempt[]);
 }
 
 function RateCell({ rate }: { rate: number }) {
@@ -118,211 +234,130 @@ function RateCell({ rate }: { rate: number }) {
   );
 }
 
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 export function GlobalDashboard() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [feathers, setFeathers] = useState<GlobalRow[]>([]);
-  const [accessories, setAccessories] = useState<GlobalRow[]>([]);
-  const [gear, setGear] = useState<GlobalGearRow[]>([]);
   const [userScope, setUserScope] = useState<'all' | 'current' | 'nickname'>('all');
-  const [availableUsers, setAvailableUsers] = useState<UserIdentityRow[]>([]);
   const [selectedNicknameUserId, setSelectedNicknameUserId] = useState('');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedGearItemLevel, setSelectedGearItemLevel] = useState<number>(65);
   const [selectedGearGrade, setSelectedGearGrade] = useState<ItemQuality>('purple');
   const [selectedGearStoneLevel, setSelectedGearStoneLevel] = useState<string>('1');
   const [selectedGearSupplement, setSelectedGearSupplement] = useState<SupplementTier | 'all'>('all');
   const [selectedGearEnchantLevel, setSelectedGearEnchantLevel] = useState<number | 'all'>('all');
 
-  const fetchUsers = async () => {
-    const [feathersUsersRes, accessoriesUsersRes, gearUsersRes] = await Promise.all([
-      supabase.from('feathers_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
-      supabase.from('accessories_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
-      supabase.from('gear_attempts').select('user_id,NickName:nickname,discord_name').order('created_at', { ascending: false }),
-    ]);
+  const currentUserQuery = useQuery({
+    queryKey: ['currentUserId'],
+    queryFn: fetchCurrentUserId,
+  });
 
-    if (feathersUsersRes.error || accessoriesUsersRes.error || gearUsersRes.error) {
-      setError(
-        feathersUsersRes.error?.message ||
-          accessoriesUsersRes.error?.message ||
-          gearUsersRes.error?.message ||
-          'Failed to load users list.',
-      );
-      return;
-    }
+  const usersQuery = useQuery({
+    queryKey: ['availableAttemptUsers'],
+    queryFn: fetchAvailableUsers,
+  });
 
-    const map = new Map<string, UserIdentityRow>();
-    const allRows = [
-      ...((feathersUsersRes.data ?? []) as UserIdentityRow[]),
-      ...((accessoriesUsersRes.data ?? []) as UserIdentityRow[]),
-      ...((gearUsersRes.data ?? []) as UserIdentityRow[]),
-    ];
+  const availableUsers = usersQuery.data ?? [];
+  const effectiveNicknameUserId = selectedNicknameUserId || availableUsers[0]?.user_id || '';
 
-    for (const row of allRows) {
-      const existing = map.get(row.user_id);
-      if (!existing) {
-        map.set(row.user_id, row);
-        continue;
-      }
-      if (!existing.NickName && row.NickName) {
-        map.set(row.user_id, row);
-        continue;
-      }
-      if (!existing.discord_name && row.discord_name) {
-        map.set(row.user_id, row);
-      }
-    }
+  const selectedUserId =
+    userScope === 'all'
+      ? null
+      : userScope === 'current'
+        ? (currentUserQuery.data ?? null)
+        : (effectiveNicknameUserId || null);
 
-    const users = Array.from(map.values()).sort((a, b) => {
-      const nameA = (a.NickName ?? a.discord_name ?? '').toLowerCase();
-      const nameB = (b.NickName ?? b.discord_name ?? '').toLowerCase();
-      if (nameA && nameB) return nameA.localeCompare(nameB);
-      if (nameA) return -1;
-      if (nameB) return 1;
-      return a.user_id.localeCompare(b.user_id);
-    });
+  const globalFeathersQuery = useQuery({
+    queryKey: ['globalFeathersStats'],
+    queryFn: fetchGlobalFeathersStats,
+    enabled: userScope === 'all',
+  });
 
-    setAvailableUsers(users);
-    if (!selectedNicknameUserId && users.length > 0) {
-      setSelectedNicknameUserId(users[0].user_id);
-    }
-  };
+  const globalAccessoriesQuery = useQuery({
+    queryKey: ['globalAccessoriesStats'],
+    queryFn: fetchGlobalAccessoriesStats,
+    enabled: userScope === 'all',
+  });
 
-  const fetchStats = async () => {
-    setLoading(true);
-    setError(null);
+  const globalGearQuery = useQuery({
+    queryKey: ['globalGearStats'],
+    queryFn: fetchGlobalGearStats,
+    enabled: userScope === 'all',
+  });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    setCurrentUserId(user?.id ?? null);
+  const userFeathersQuery = useQuery({
+    queryKey: ['userFeathersStats', selectedUserId],
+    queryFn: () => fetchUserFeathersStats(selectedUserId as string),
+    enabled: userScope !== 'all' && !!selectedUserId,
+  });
 
-    const selectedUserId =
-      userScope === 'all'
-        ? null
-        : userScope === 'current'
-          ? (user?.id ?? null)
-          : (selectedNicknameUserId || null);
+  const userAccessoriesQuery = useQuery({
+    queryKey: ['userAccessoriesStats', selectedUserId],
+    queryFn: () => fetchUserAccessoriesStats(selectedUserId as string),
+    enabled: userScope !== 'all' && !!selectedUserId,
+  });
 
-    if (userScope !== 'all' && !selectedUserId) {
-      setError('Select a valid user for personal stats.');
-      setLoading(false);
-      return;
-    }
+  const userGearQuery = useQuery({
+    queryKey: ['userGearStats', selectedUserId],
+    queryFn: () => fetchUserGearStats(selectedUserId as string),
+    enabled: userScope !== 'all' && !!selectedUserId,
+  });
 
-    if (selectedUserId) {
-      const [feathersRawRes, accessoriesRawRes, gearRawRes] = await Promise.all([
-        supabase
-          .from('feathers_attempts')
-          .select('target_level,is_success,NickName:nickname')
-          .eq('user_id', selectedUserId),
-        supabase
-          .from('accessories_attempts')
-          .select('target_level,is_success,NickName:nickname')
-          .eq('user_id', selectedUserId),
-        supabase
-          .from('gear_attempts')
-          .select('item_level,item_grade,stone_level,target_level,is_success,supplement,NickName:nickname')
-          .eq('user_id', selectedUserId),
-      ]);
+  const feathers = useMemo(
+    () => (userScope === 'all' ? globalFeathersQuery.data ?? [] : userFeathersQuery.data ?? []),
+    [userScope, globalFeathersQuery.data, userFeathersQuery.data],
+  );
 
-      if (feathersRawRes.error || accessoriesRawRes.error || gearRawRes.error) {
-        setError(feathersRawRes.error?.message || accessoriesRawRes.error?.message || gearRawRes.error?.message || 'Failed to load user stats.');
-        setLoading(false);
-        return;
-      }
+  const accessories = useMemo(
+    () => (userScope === 'all' ? globalAccessoriesQuery.data ?? [] : userAccessoriesQuery.data ?? []),
+    [userScope, globalAccessoriesQuery.data, userAccessoriesQuery.data],
+  );
 
-      setFeathers(aggregateSimpleRows((feathersRawRes.data ?? []) as RawAttempt[]));
-      setAccessories(aggregateSimpleRows((accessoriesRawRes.data ?? []) as RawAttempt[]));
-      const gearRows = aggregateGearRows((gearRawRes.data ?? []) as RawGearAttempt[]);
-      setGear(gearRows);
-      if (gearRows.length > 0) {
-        const itemLevels = Array.from(new Set(gearRows.map((r) => r.item_level))).sort((a, b) => a - b);
-        setSelectedGearItemLevel(itemLevels[0]);
-        const first = gearRows[0];
-        setSelectedGearGrade(first.item_grade as ItemQuality);
-        setSelectedGearStoneLevel(String(first.stone_level));
-        setSelectedGearSupplement(first.supplement);
-      }
-      setLoading(false);
-      return;
-    }
-
-    const [feathersRes, accessoriesRes, gearRes] = await Promise.all([
-      supabase
-        .from('global_feathers_stats')
-        .select('*')
-        .order('target_level', { ascending: true }),
-      supabase
-        .from('global_accessories_stats')
-        .select('*')
-        .order('target_level', { ascending: true }),
-      supabase
-        .from('global_gear_stats')
-        .select('*')
-        .order('item_level', { ascending: true })
-        .order('item_grade', { ascending: true })
-        .order('stone_level', { ascending: true })
-        .order('supplement', { ascending: true })
-        .order('target_level', { ascending: true }),
-    ]);
-
-    if (feathersRes.error || accessoriesRes.error || gearRes.error) {
-      setError(feathersRes.error?.message || accessoriesRes.error?.message || gearRes.error?.message || 'Failed to load global stats.');
-      setLoading(false);
-      return;
-    }
-
-    setFeathers((feathersRes.data ?? []) as GlobalRow[]);
-    setAccessories((accessoriesRes.data ?? []) as GlobalRow[]);
-    const gearRows = ((gearRes.data ?? []) as Array<GlobalGearRow & { supplement?: SupplementTier }>).map((row) => ({
-      ...row,
-      supplement: normalizeSupplement(row.supplement),
-    }));
-    setGear(gearRows);
-    if (gearRows.length > 0) {
-      const itemLevels = Array.from(new Set(gearRows.map((r) => r.item_level))).sort((a, b) => a - b);
-      setSelectedGearItemLevel(itemLevels[0]);
-      const first = gearRows[0];
-      setSelectedGearGrade(first.item_grade as ItemQuality);
-      setSelectedGearStoneLevel(String(first.stone_level));
-      setSelectedGearSupplement(first.supplement);
-    }
-    setLoading(false);
-  };
+  const gear = useMemo(
+    () => (userScope === 'all' ? globalGearQuery.data ?? [] : userGearQuery.data ?? []),
+    [userScope, globalGearQuery.data, userGearQuery.data],
+  );
 
   const gearItemLevels = useMemo(
     () => Array.from(new Set(gear.map((r) => r.item_level))).sort((a, b) => a - b),
     [gear],
   );
 
+  const activeGearItemLevel =
+    gearItemLevels.includes(selectedGearItemLevel) ? selectedGearItemLevel : (gearItemLevels[0] ?? selectedGearItemLevel);
+
   const gearGrades = useMemo(
     () =>
       Array.from(
         new Set(
           gear
-            .filter((r) => r.item_level === selectedGearItemLevel)
+            .filter((r) => r.item_level === activeGearItemLevel)
             .map((r) => r.item_grade as ItemQuality),
         ),
       ),
-    [gear, selectedGearItemLevel],
+    [gear, activeGearItemLevel],
   );
+
+  const activeGearGrade =
+    gearGrades.includes(selectedGearGrade) ? selectedGearGrade : (gearGrades[0] ?? selectedGearGrade);
 
   const gearStoneLevels = useMemo(
     () =>
       Array.from(
         new Set(
           gear
-            .filter(
-              (r) =>
-                r.item_level === selectedGearItemLevel &&
-                r.item_grade === selectedGearGrade,
-            )
+            .filter((r) => r.item_level === activeGearItemLevel && r.item_grade === activeGearGrade)
             .map((r) => String(r.stone_level)),
         ),
       ).sort((a, b) => Number(a) - Number(b)),
-    [gear, selectedGearItemLevel, selectedGearGrade],
+    [gear, activeGearItemLevel, activeGearGrade],
   );
+
+  const activeGearStoneLevel =
+    gearStoneLevels.includes(selectedGearStoneLevel)
+      ? selectedGearStoneLevel
+      : (gearStoneLevels[0] ?? selectedGearStoneLevel);
 
   const gearSupplements = useMemo(() => {
     const supplements = Array.from(
@@ -330,46 +365,43 @@ export function GlobalDashboard() {
         gear
           .filter(
             (r) =>
-              r.item_level === selectedGearItemLevel &&
-              r.item_grade === selectedGearGrade &&
-              String(r.stone_level) === selectedGearStoneLevel,
+              r.item_level === activeGearItemLevel &&
+              r.item_grade === activeGearGrade &&
+              String(r.stone_level) === activeGearStoneLevel,
           )
           .map((r) => normalizeSupplement(r.supplement)),
       ),
     );
     return supplements.sort((a, b) => ALL_SUPPLEMENTS.indexOf(a) - ALL_SUPPLEMENTS.indexOf(b));
-  }, [gear, selectedGearItemLevel, selectedGearGrade, selectedGearStoneLevel]);
+  }, [gear, activeGearItemLevel, activeGearGrade, activeGearStoneLevel]);
+
+  const activeGearSupplement =
+    selectedGearSupplement === 'all' || gearSupplements.includes(selectedGearSupplement)
+      ? selectedGearSupplement
+      : (gearSupplements[0] ?? 'all');
 
   const filteredGearRows = useMemo(() => {
     const rows = gear.filter(
       (r) =>
-        r.item_level === selectedGearItemLevel &&
-        r.item_grade === selectedGearGrade &&
-        String(r.stone_level) === selectedGearStoneLevel &&
-        (selectedGearSupplement === 'all' || r.supplement === selectedGearSupplement),
+        r.item_level === activeGearItemLevel &&
+        r.item_grade === activeGearGrade &&
+        String(r.stone_level) === activeGearStoneLevel &&
+        (activeGearSupplement === 'all' || r.supplement === activeGearSupplement),
     );
     if (selectedGearEnchantLevel === 'all') return rows;
     return rows.filter((r) => r.target_level === selectedGearEnchantLevel);
   }, [
     gear,
-    selectedGearItemLevel,
-    selectedGearGrade,
-    selectedGearStoneLevel,
-    selectedGearSupplement,
+    activeGearItemLevel,
+    activeGearGrade,
+    activeGearStoneLevel,
+    activeGearSupplement,
     selectedGearEnchantLevel,
   ]);
 
-  useEffect(() => {
-    void fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    void fetchStats();
-  }, [userScope, selectedNicknameUserId]);
-
   const selectedNicknameUser = useMemo(
-    () => availableUsers.find((u) => u.user_id === selectedNicknameUserId) ?? null,
-    [availableUsers, selectedNicknameUserId],
+    () => availableUsers.find((u) => u.user_id === effectiveNicknameUserId) ?? null,
+    [availableUsers, effectiveNicknameUserId],
   );
 
   const formatUserLabel = (user: UserIdentityRow): string => {
@@ -378,19 +410,59 @@ export function GlobalDashboard() {
     return displayName ? `${displayName} (${shortId}...)` : `Unknown (${shortId}...)`;
   };
 
+  const selectedUserMissing = userScope !== 'all' && !selectedUserId;
+
+  const activeQueries = userScope === 'all'
+    ? [globalFeathersQuery, globalAccessoriesQuery, globalGearQuery]
+    : [userFeathersQuery, userAccessoriesQuery, userGearQuery];
+
+  const isLoading =
+    (userScope === 'current' && currentUserQuery.isLoading) ||
+    (userScope === 'nickname' && usersQuery.isLoading) ||
+    (!selectedUserMissing && activeQueries.some((q) => q.isLoading));
+
+  const queryError =
+    (userScope === 'nickname' ? usersQuery.error : null) ||
+    (userScope === 'current' ? currentUserQuery.error : null) ||
+    activeQueries.find((q) => q.isError)?.error;
+
+  const error = selectedUserMissing
+    ? 'Select a valid user for personal stats.'
+    : queryError
+      ? toErrorMessage(queryError, userScope === 'all' ? 'Failed to load global stats.' : 'Failed to load user stats.')
+      : null;
+
+  const handleRefresh = () => {
+    void currentUserQuery.refetch();
+    void usersQuery.refetch();
+
+    if (userScope === 'all') {
+      void globalFeathersQuery.refetch();
+      void globalAccessoriesQuery.refetch();
+      void globalGearQuery.refetch();
+      return;
+    }
+
+    if (selectedUserId) {
+      void userFeathersQuery.refetch();
+      void userAccessoriesQuery.refetch();
+      void userGearQuery.refetch();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-aion-gold">Global Dashboard</h2>
         <button
-          onClick={() => void fetchStats()}
+          onClick={handleRefresh}
           className="px-3 py-1.5 rounded-lg border border-aion-border text-aion-muted text-sm hover:bg-white/5 transition"
         >
           Refresh
         </button>
       </div>
 
-      {loading && <p className="text-sm text-aion-muted">Loading community stats...</p>}
+      {isLoading && <p className="text-sm text-aion-muted">Loading community stats...</p>}
       {error && <p className="text-sm text-aion-danger">{error}</p>}
 
       <section className="bg-aion-row border border-aion-border rounded-lg p-4 space-y-3">
@@ -416,7 +488,7 @@ export function GlobalDashboard() {
             <label className="text-xs text-aion-muted">
               Discord user
               <select
-                value={selectedNicknameUserId}
+                value={effectiveNicknameUserId}
                 onChange={(e) => setSelectedNicknameUserId(e.target.value)}
                 className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
               >
@@ -432,7 +504,7 @@ export function GlobalDashboard() {
 
           {userScope === 'current' && (
             <div className="text-xs text-aion-muted self-end">
-              Current user ID: <span className="text-aion-text">{currentUserId ?? 'Not logged in'}</span>
+              Current user ID: <span className="text-aion-text">{currentUserQuery.data ?? 'Not logged in'}</span>
             </div>
           )}
 
@@ -444,7 +516,7 @@ export function GlobalDashboard() {
         </div>
       </section>
 
-      {!loading && !error && (
+      {!isLoading && !error && (
         <>
           <section className="bg-aion-row border border-aion-border rounded-lg p-4">
             <h3 className="text-lg font-semibold text-aion-gold mb-3">Feathers</h3>
@@ -504,21 +576,13 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Item Level
                 <select
-                  value={selectedGearItemLevel}
+                  value={activeGearItemLevel}
                   onChange={(e) => {
                     const nextLevel = Number(e.target.value);
                     setSelectedGearItemLevel(nextLevel);
-                    const nextGrade = gear
-                      .find((r) => r.item_level === nextLevel)
-                      ?.item_grade as ItemQuality | undefined;
+                    const nextGrade = gear.find((r) => r.item_level === nextLevel)?.item_grade as ItemQuality | undefined;
                     if (nextGrade) setSelectedGearGrade(nextGrade);
-                    const nextStone = gear
-                      .find(
-                        (r) =>
-                          r.item_level === nextLevel &&
-                          r.item_grade === (nextGrade ?? selectedGearGrade),
-                      )
-                      ?.stone_level;
+                    const nextStone = gear.find((r) => r.item_level === nextLevel && r.item_grade === (nextGrade ?? activeGearGrade))?.stone_level;
                     if (nextStone) setSelectedGearStoneLevel(String(nextStone));
                   }}
                   className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
@@ -534,17 +598,11 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Item Quality
                 <select
-                  value={selectedGearGrade}
+                  value={activeGearGrade}
                   onChange={(e) => {
                     const nextGrade = e.target.value as ItemQuality;
                     setSelectedGearGrade(nextGrade);
-                    const nextStone = gear
-                      .find(
-                        (r) =>
-                          r.item_level === selectedGearItemLevel &&
-                          r.item_grade === nextGrade,
-                      )
-                      ?.stone_level;
+                    const nextStone = gear.find((r) => r.item_level === activeGearItemLevel && r.item_grade === nextGrade)?.stone_level;
                     if (nextStone) setSelectedGearStoneLevel(String(nextStone));
                   }}
                   className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
@@ -560,7 +618,7 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Stone Level
                 <select
-                  value={selectedGearStoneLevel}
+                  value={activeGearStoneLevel}
                   onChange={(e) => setSelectedGearStoneLevel(e.target.value)}
                   className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
                 >
@@ -575,7 +633,7 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Supplement
                 <select
-                  value={selectedGearSupplement}
+                  value={activeGearSupplement}
                   onChange={(e) => setSelectedGearSupplement(e.target.value as SupplementTier | 'all')}
                   className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
                 >
