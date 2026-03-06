@@ -142,40 +142,6 @@ function initUnsyncedAttempts(): UnsyncedAttemptsState {
   };
 }
 
-/* ── Helpers ── */
-
-function ensureGearPath(
-  stats: GearState['stats'],
-  quality: string,
-  stone: number,
-  level: number,
-): GearAttemptRecord {
-  if (!stats[quality]) stats[quality] = {};
-  if (!stats[quality][stone]) stats[quality][stone] = {};
-  if (!stats[quality][stone][level]) {
-    stats[quality][stone][level] = { success: 0, fail: 0 };
-  }
-  return stats[quality][stone][level];
-}
-
-function ensureGearInventoryPath(
-  inventory: GearState['inventory'],
-  quality: string,
-  level: number,
-): number {
-  if (!inventory[quality]) inventory[quality] = {};
-  inventory[quality][level] ??= 0;
-  return inventory[quality][level];
-}
-
-function ensureGearCritByItemLevelPath(
-  critByItemLevel: GearState['critByItemLevel'],
-  itemLevel: number,
-): { successTotal: number; critTotal: number } {
-  critByItemLevel[itemLevel] ??= { successTotal: 0, critTotal: 0 };
-  return critByItemLevel[itemLevel];
-}
-
 /* ── Store ── */
 
 export const useStore = create<AppState>()(
@@ -194,15 +160,28 @@ export const useStore = create<AppState>()(
       /* ── Feathers: failure DESTROYS the item ── */
       recordFeatherAttempt: (targetLevel, type) =>
         set((state) => {
-          const f = structuredClone(state.feathers);
-          // Need a source feather (base +0 is infinite)
-          if (targetLevel > 1 && f.inventory[targetLevel - 1] <= 0) return state;
-          if (targetLevel > 1) f.inventory[targetLevel - 1]--;
-          f.stats[targetLevel][type]++;
-          if (type === 'success') f.inventory[targetLevel]++;
+          const sourceLevel = targetLevel - 1;
+          const currentInventory = state.feathers.inventory[sourceLevel] ?? 0;
+          if (targetLevel > 1 && currentInventory <= 0) return state;
+
+          const createdAt = new Date().toISOString();
+          const nextInventory = { ...state.feathers.inventory };
+          const nextStats = {
+            ...state.feathers.stats,
+            [targetLevel]: {
+              ...state.feathers.stats[targetLevel],
+              [type]: state.feathers.stats[targetLevel][type] + 1,
+            },
+          };
+
+          if (targetLevel > 1) nextInventory[sourceLevel] = currentInventory - 1;
+          if (type === 'success') nextInventory[targetLevel] = (nextInventory[targetLevel] ?? 0) + 1;
 
           return {
-            feathers: f,
+            feathers: {
+              stats: nextStats,
+              inventory: nextInventory,
+            },
             unsyncedAttempts: {
               ...state.unsyncedAttempts,
               feathers: [
@@ -210,7 +189,7 @@ export const useStore = create<AppState>()(
                 {
                   targetLevel,
                   isSuccess: type === 'success',
-                  createdAt: new Date().toISOString(),
+                  createdAt,
                 },
               ],
             },
@@ -220,15 +199,29 @@ export const useStore = create<AppState>()(
       /* ── Accessories: configurable fail behaviour ── */
       recordAccessoryAttempt: (targetLevel, type) =>
         set((state) => {
-          const a = structuredClone(state.accessories);
-          if (targetLevel > 1 && a.inventory[targetLevel - 1] <= 0) return state;
-          if (targetLevel > 1) a.inventory[targetLevel - 1]--;
-          a.stats[targetLevel][type]++;
-          if (type === 'success') a.inventory[targetLevel]++;
-          if (type === 'fail') a.inventory[0]++;
+          const sourceLevel = targetLevel - 1;
+          const currentInventory = state.accessories.inventory[sourceLevel] ?? 0;
+          if (targetLevel > 1 && currentInventory <= 0) return state;
+
+          const createdAt = new Date().toISOString();
+          const nextInventory = { ...state.accessories.inventory };
+          const nextStats = {
+            ...state.accessories.stats,
+            [targetLevel]: {
+              ...state.accessories.stats[targetLevel],
+              [type]: state.accessories.stats[targetLevel][type] + 1,
+            },
+          };
+
+          if (targetLevel > 1) nextInventory[sourceLevel] = currentInventory - 1;
+          if (type === 'success') nextInventory[targetLevel] = (nextInventory[targetLevel] ?? 0) + 1;
+          if (type === 'fail') nextInventory[0] = (nextInventory[0] ?? 0) + 1;
 
           return {
-            accessories: a,
+            accessories: {
+              stats: nextStats,
+              inventory: nextInventory,
+            },
             unsyncedAttempts: {
               ...state.unsyncedAttempts,
               accessories: [
@@ -236,7 +229,7 @@ export const useStore = create<AppState>()(
                 {
                   targetLevel,
                   isSuccess: type === 'success',
-                  createdAt: new Date().toISOString(),
+                  createdAt,
                 },
               ],
             },
@@ -246,21 +239,18 @@ export const useStore = create<AppState>()(
       /* ── Gear: failure drops level by 1, item NOT destroyed ── */
       recordGearAttempt: (quality, stoneLevel, supplement, level, type, critType) =>
         set((state) => {
-          const g = structuredClone(state.gear);
-          const itemLevel = g.selectedItemLevel;
+          const itemLevel = state.gear.selectedItemLevel;
           const sourceLevel = level - 1;
+          const currentQualityInventory = state.gear.inventory[quality] ?? {};
+          const currentSourceCount = currentQualityInventory[sourceLevel] ?? 0;
 
-          if (level > 1) {
-            const sourceCount = ensureGearInventoryPath(g.inventory, quality, level - 1);
-            if (sourceCount <= 0) return state;
-            g.inventory[quality][level - 1]--;
-          }
+          if (level > 1 && currentSourceCount <= 0) return state;
 
-          const rec = ensureGearPath(g.stats, quality, stoneLevel, level);
-          rec[type]++;
+          const createdAt = new Date().toISOString();
+          const nextQualityInventory = { ...currentQualityInventory };
+          if (level > 1) nextQualityInventory[sourceLevel] = currentSourceCount - 1;
 
           if (type === 'success') {
-            ensureGearCritByItemLevelPath(g.critByItemLevel, itemLevel).successTotal++;
             const critIsEnabled = sourceLevel < 10;
             const critJump = critIsEnabled
               ? critType === 'crit3'
@@ -270,22 +260,53 @@ export const useStore = create<AppState>()(
                   : 1
               : 1;
             const resultLevel = Math.min(sourceLevel + critJump, 15);
-            ensureGearInventoryPath(g.inventory, quality, resultLevel);
-            g.inventory[quality][resultLevel]++;
+            nextQualityInventory[resultLevel] = (nextQualityInventory[resultLevel] ?? 0) + 1;
           }
 
           if (type === 'fail' && level > 1) {
             const downLevel = sourceLevel >= 11 ? 10 : Math.max(0, sourceLevel - 1);
-            ensureGearInventoryPath(g.inventory, quality, downLevel);
-            g.inventory[quality][downLevel]++;
+            nextQualityInventory[downLevel] = (nextQualityInventory[downLevel] ?? 0) + 1;
           }
 
-          if (type === 'success' && critType && sourceLevel < 10) {
-            ensureGearCritByItemLevelPath(g.critByItemLevel, itemLevel).critTotal++;
+          const qualityStats = state.gear.stats[quality] ?? {};
+          const stoneStats = qualityStats[stoneLevel] ?? {};
+          const previousRecord = stoneStats[level] ?? { success: 0, fail: 0 };
+          const nextStats = {
+            ...state.gear.stats,
+            [quality]: {
+              ...qualityStats,
+              [stoneLevel]: {
+                ...stoneStats,
+                [level]: {
+                  ...previousRecord,
+                  [type]: previousRecord[type] + 1,
+                },
+              },
+            },
+          };
+
+          let nextCritByItemLevel = state.gear.critByItemLevel;
+          if (type === 'success') {
+            const previousCrit = state.gear.critByItemLevel[itemLevel] ?? { successTotal: 0, critTotal: 0 };
+            nextCritByItemLevel = {
+              ...state.gear.critByItemLevel,
+              [itemLevel]: {
+                successTotal: previousCrit.successTotal + 1,
+                critTotal: previousCrit.critTotal + (critType && sourceLevel < 10 ? 1 : 0),
+              },
+            };
           }
 
           return {
-            gear: g,
+            gear: {
+              ...state.gear,
+              stats: nextStats,
+              inventory: {
+                ...state.gear.inventory,
+                [quality]: nextQualityInventory,
+              },
+              critByItemLevel: nextCritByItemLevel,
+            },
             unsyncedAttempts: {
               ...state.unsyncedAttempts,
               gear: [
@@ -297,7 +318,7 @@ export const useStore = create<AppState>()(
                   itemGrade: quality,
                   stoneLevel: String(stoneLevel),
                   supplement,
-                  createdAt: new Date().toISOString(),
+                  createdAt,
                 },
               ],
             },

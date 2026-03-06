@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store/useStore';
 import { tr } from '../i18n';
 import { supabase } from '../lib/supabase';
@@ -41,14 +43,21 @@ function formatCurrency(num: number, locale: string): string {
   return Math.round(num).toLocaleString(locale);
 }
 
+async function fetchGlobalFeatherStats(): Promise<GlobalFeatherRow[]> {
+  const { data, error } = await supabase.from('global_feathers_stats').select('*').order('target_level', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as GlobalFeatherRow[];
+}
+
 export function FeatherPriceCalculator() {
-  const lang = useStore((s) => s.language);
-  const localFeatherStats = useStore((s) => s.feathers.stats);
+  const { lang, localFeatherStats } = useStore(
+    useShallow((state) => ({
+      lang: state.language,
+      localFeatherStats: state.feathers.stats,
+    })),
+  );
 
   const [statsSource, setStatsSource] = useState<StatsSource>('local');
-  const [globalStatsData, setGlobalStatsData] = useState<Record<number, { success: number; fail: number }>>({});
-  const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
-  const [globalError, setGlobalError] = useState<string | null>(null);
 
   const [targetLevel, setTargetLevel] = useState(5);
   const [waterPriceInput, setWaterPriceInput] = useState('100кк');
@@ -56,32 +65,24 @@ export function FeatherPriceCalculator() {
 
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
-  useEffect(() => {
-    if (statsSource !== 'global') return;
-    setIsLoadingGlobal(true);
-    setGlobalError(null);
-    supabase
-      .from('global_feathers_stats')
-      .select('*')
-      .order('target_level', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          setGlobalError(error.message);
-        } else {
-          const converted: Record<number, { success: number; fail: number }> = {};
-          for (const row of (data ?? []) as GlobalFeatherRow[]) {
-            converted[row.target_level] = {
-              success: row.successful_attempts,
-              fail: row.total_attempts - row.successful_attempts,
-            };
-          }
-          setGlobalStatsData(converted);
-        }
-        setIsLoadingGlobal(false);
-      });
-  }, [statsSource]);
+  const globalStatsQuery = useQuery({
+    queryKey: ['globalFeathersStats'],
+    queryFn: fetchGlobalFeatherStats,
+    enabled: statsSource === 'global',
+    staleTime: 5 * 60 * 1000,
+    select: (rows) => {
+      const converted: Record<number, { success: number; fail: number }> = {};
+      for (const row of rows) {
+        converted[row.target_level] = {
+          success: row.successful_attempts,
+          fail: row.total_attempts - row.successful_attempts,
+        };
+      }
+      return converted;
+    },
+  });
 
-  const featherStats = statsSource === 'global' ? globalStatsData : localFeatherStats;
+  const featherStats = statsSource === 'global' ? (globalStatsQuery.data ?? {}) : localFeatherStats;
 
   const result = useMemo(() => {
     const waterPrice = parseCurrency(waterPriceInput);
@@ -158,12 +159,12 @@ export function FeatherPriceCalculator() {
         </div>
       </div>
 
-      {isLoadingGlobal && (
-        <div className="text-sm text-aion-muted animate-pulse">{tr(lang, 'loadingGlobalStats')}</div>
+      {globalStatsQuery.isLoading && (
+        <div aria-live="polite" className="text-sm text-aion-muted animate-pulse">{tr(lang, 'loadingGlobalStats')}</div>
       )}
-      {globalError && (
-        <div className="text-sm text-aion-danger bg-aion-danger/10 border border-aion-danger/50 rounded-lg px-3 py-2">
-          {tr(lang, 'globalStatsError')}: {globalError}
+      {globalStatsQuery.error && (
+        <div aria-live="polite" className="text-sm text-aion-danger bg-aion-danger/10 border border-aion-danger/50 rounded-lg px-3 py-2">
+          {tr(lang, 'globalStatsError')}: {globalStatsQuery.error.message}
         </div>
       )}
 
@@ -171,30 +172,39 @@ export function FeatherPriceCalculator() {
         <label className="text-sm">
           <div className="text-aion-muted mb-1">{tr(lang, 'targetEnchant')} (+1...+10)</div>
           <input
+            autoComplete="off"
+            inputMode="numeric"
+            name="targetLevel"
             type="number"
             min={1}
             max={10}
             value={targetLevel}
             onChange={(e) => setTargetLevel(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
-            className="w-full bg-aion-row border border-aion-border rounded px-3 py-2 outline-none focus:border-aion-gold"
+            className="w-full bg-aion-row text-aion-text border border-aion-border rounded px-3 py-2 transition-colors focus-visible:border-aion-gold"
           />
         </label>
 
         <label className="text-sm">
           <div className="text-aion-muted mb-1">{tr(lang, 'waterPrice')}</div>
           <input
+            autoComplete="off"
+            inputMode="decimal"
+            name="waterPrice"
             value={waterPriceInput}
             onChange={(e) => setWaterPriceInput(e.target.value)}
-            className="w-full bg-aion-row border border-aion-border rounded px-3 py-2 outline-none focus:border-aion-gold"
+            className="w-full bg-aion-row text-aion-text border border-aion-border rounded px-3 py-2 transition-colors focus-visible:border-aion-gold"
           />
         </label>
 
         <label className="text-sm">
           <div className="text-aion-muted mb-1">{tr(lang, 'baseFeatherPrice')}</div>
           <input
+            autoComplete="off"
+            inputMode="decimal"
+            name="baseFeatherPrice"
             value={featherPriceInput}
             onChange={(e) => setFeatherPriceInput(e.target.value)}
-            className="w-full bg-aion-row border border-aion-border rounded px-3 py-2 outline-none focus:border-aion-gold"
+            className="w-full bg-aion-row text-aion-text border border-aion-border rounded px-3 py-2 transition-colors focus-visible:border-aion-gold"
           />
         </label>
       </div>
@@ -202,7 +212,7 @@ export function FeatherPriceCalculator() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-aion-row border border-aion-border rounded-lg p-4">
           <div className="text-xs text-aion-muted mb-1">{tr(lang, 'avgFeathersNeeded')}</div>
-          <div className="text-2xl font-bold text-aion-gold">
+          <div className="text-2xl font-bold text-aion-gold tabular-nums">
             {result.hasMissingStepChance
               ? '—'
               : result.expectedFeathers.toLocaleString(locale, { maximumFractionDigits: 1 })}
@@ -211,7 +221,7 @@ export function FeatherPriceCalculator() {
 
         <div className="bg-aion-row border border-aion-border rounded-lg p-4">
           <div className="text-xs text-aion-muted mb-1">{tr(lang, 'avgWaterNeeded')}</div>
-          <div className="text-2xl font-bold text-aion-gold">
+          <div className="text-2xl font-bold text-aion-gold tabular-nums">
             {result.hasMissingStepChance
               ? '—'
               : result.expectedWater.toLocaleString(locale, { maximumFractionDigits: 1 })}
@@ -220,7 +230,7 @@ export function FeatherPriceCalculator() {
 
         <div className="bg-aion-row border border-aion-border rounded-lg p-4">
           <div className="text-xs text-aion-muted mb-1">{tr(lang, 'estTotalCost')}</div>
-          <div className="text-2xl font-bold text-aion-success">
+          <div className="text-2xl font-bold text-aion-success tabular-nums">
             {result.hasMissingStepChance ? '—' : formatCurrency(result.expectedCost, locale)}
           </div>
         </div>
@@ -240,7 +250,7 @@ export function FeatherPriceCalculator() {
         </div>
       </div>
 
-      {result.hasMissingStepChance && !isLoadingGlobal && (
+      {result.hasMissingStepChance && !globalStatsQuery.isLoading && (
         <div className="text-sm text-aion-danger bg-aion-danger/10 border border-aion-danger/50 rounded-lg px-3 py-2">
           {statsSource === 'global' ? tr(lang, 'missingStepDataGlobal') : tr(lang, 'missingStepData')}
         </div>

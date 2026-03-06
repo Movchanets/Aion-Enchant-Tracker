@@ -79,9 +79,11 @@ export function GearTracker() {
               const isActive = selectedQuality === q;
               return (
                 <button
+                  type="button"
                   key={q}
                   onClick={() => setQuality(q)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium border transition ${
+                  aria-pressed={isActive}
+                  className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                     isActive
                       ? 'bg-white/10 shadow-sm'
                       : 'border-aion-border text-aion-muted hover:bg-white/5'
@@ -104,9 +106,11 @@ export function GearTracker() {
           <div className="grid grid-cols-5 gap-1.5">
             {ALL_STONE_LEVELS.map((sl) => (
               <button
+                type="button"
                 key={sl}
                 onClick={() => setStoneLevel(sl)}
-                className={`w-full px-2 py-1 rounded text-sm font-medium border transition ${
+                aria-pressed={selectedStoneLevel === sl}
+                className={`w-full px-2 py-1 rounded text-sm font-medium border transition-colors ${
                   selectedStoneLevel === sl
                     ? 'border-aion-gold text-aion-gold bg-aion-gold/15'
                     : 'border-aion-border text-aion-muted hover:bg-white/5'
@@ -121,6 +125,9 @@ export function GearTracker() {
         <div className="p-3 bg-aion-row rounded-lg border border-aion-border">
           <div className="text-xs text-aion-muted mb-2">{tr(lang, 'itemLevel')}</div>
           <input
+            autoComplete="off"
+            inputMode="numeric"
+            name="gearItemLevel"
             type="number"
             min={1}
             max={65}
@@ -129,16 +136,18 @@ export function GearTracker() {
               const val = Number(e.target.value) || 1;
               setGearItemLevel(Math.min(65, Math.max(1, val)));
             }}
-            className="w-full bg-aion-bg/70 border border-aion-border rounded px-2.5 py-1.5 outline-none focus:border-aion-gold"
+            className="w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2.5 py-1.5 transition-colors focus-visible:border-aion-gold"
           />
         </div>
 
         <div className="p-3 bg-aion-row rounded-lg border border-aion-border">
           <div className="text-xs text-aion-muted mb-2">{tr(lang, 'supplement')}</div>
           <select
+            autoComplete="off"
+            name="gearSupplement"
             value={selectedSupplement}
             onChange={(e) => setSupplement(e.target.value as SupplementTier)}
-            className="w-full bg-aion-bg/70 border border-aion-border rounded px-2.5 py-1.5 outline-none focus:border-aion-gold"
+            className="w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2.5 py-1.5 transition-colors focus-visible:border-aion-gold"
           >
             {ALL_SUPPLEMENTS.map((supplement) => (
               <option key={supplement} value={supplement}>
@@ -209,20 +218,22 @@ export function GearTracker() {
                 {/* Action buttons */}
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     disabled={!hasPre}
                     onClick={() =>
                       recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'success')
                     }
-                    className="px-3 py-1.5 rounded border border-aion-success text-aion-success text-sm bg-aion-success/10 hover:bg-aion-success/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    className="px-3 py-1.5 rounded border border-aion-success text-aion-success text-sm bg-aion-success/10 hover:bg-aion-success/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     {tr(lang, 'successBtn')}
                   </button>
                   <button
+                    type="button"
                     disabled={!hasPre}
                     onClick={() =>
                       recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'fail')
                     }
-                    className="px-3 py-1.5 rounded border border-aion-danger text-aion-danger text-sm bg-aion-danger/10 hover:bg-aion-danger/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    className="px-3 py-1.5 rounded border border-aion-danger text-aion-danger text-sm bg-aion-danger/10 hover:bg-aion-danger/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     {tr(lang, 'failBtn')}
                   </button>
@@ -235,20 +246,22 @@ export function GearTracker() {
                   )}
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       disabled={!hasPre || !critEnabled}
                       onClick={() =>
                           recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'success', 'crit2')
                       }
-                      className="px-3 py-1 rounded border border-blue-400 text-blue-300 text-xs bg-blue-400/10 hover:bg-blue-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                      className="px-3 py-1 rounded border border-blue-400 text-blue-300 text-xs bg-blue-400/10 hover:bg-blue-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       {tr(lang, 'critPlus2')}
                     </button>
                     <button
+                      type="button"
                       disabled={!hasPre || !critEnabled}
                       onClick={() =>
                           recordAttempt(selectedQuality, selectedStoneLevel, selectedSupplement, level, 'success', 'crit3')
                       }
-                      className="px-3 py-1 rounded border border-purple-400 text-purple-300 text-xs bg-purple-400/10 hover:bg-purple-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                      className="px-3 py-1 rounded border border-purple-400 text-purple-300 text-xs bg-purple-400/10 hover:bg-purple-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       {tr(lang, 'critPlus3')}
                     </button>

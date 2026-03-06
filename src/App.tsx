@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { lazy, startTransition, Suspense, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store/useStore';
 import { ConfirmModal } from './components/ConfirmModal';
-import { Dashboard } from './components/Dashboard';
-import { GlobalDashboard } from './components/GlobalDashboard';
-import { FeathersTracker } from './components/FeathersTracker';
-import { AccessoriesTracker } from './components/AccessoriesTracker';
-import { GearTracker } from './components/GearTracker';
-import { FeatherPriceCalculator } from './components/FeatherPriceCalculator';
 import { SubmitResultsButton } from './components/SubmitResultsButton';
 import { Auth } from './components/Auth';
 import { tr } from './i18n';
-import type { Tab } from './types';
+import type { Language, Tab } from './types';
+
+const Dashboard = lazy(() => import('./components/Dashboard').then((module) => ({ default: module.Dashboard })));
+const GlobalDashboard = lazy(() => import('./components/GlobalDashboard').then((module) => ({ default: module.GlobalDashboard })));
+const FeathersTracker = lazy(() => import('./components/FeathersTracker').then((module) => ({ default: module.FeathersTracker })));
+const AccessoriesTracker = lazy(() => import('./components/AccessoriesTracker').then((module) => ({ default: module.AccessoriesTracker })));
+const GearTracker = lazy(() => import('./components/GearTracker').then((module) => ({ default: module.GearTracker })));
+const FeatherPriceCalculator = lazy(() => import('./components/FeatherPriceCalculator').then((module) => ({ default: module.FeatherPriceCalculator })));
 
 const TABS: { key: Tab; labelKey: Parameters<typeof tr>[1]; icon: string }[] = [
   { key: 'dashboard', labelKey: 'tabDashboard', icon: '📊' },
@@ -21,16 +23,40 @@ const TABS: { key: Tab; labelKey: Parameters<typeof tr>[1]; icon: string }[] = [
   { key: 'calculator', labelKey: 'tabCalculator', icon: '🧮' },
 ];
 
+const TAB_COMPONENTS = {
+  dashboard: Dashboard,
+  global: GlobalDashboard,
+  feathers: FeathersTracker,
+  accessories: AccessoriesTracker,
+  gear: GearTracker,
+  calculator: FeatherPriceCalculator,
+} satisfies Record<Tab, React.ComponentType>;
+
 export default function App() {
-  const activeTab = useStore((s) => s.activeTab);
-  const language = useStore((s) => s.language);
-  const setActiveTab = useStore((s) => s.setActiveTab);
-  const setLanguage = useStore((s) => s.setLanguage);
-  const resetAll = useStore((s) => s.resetAll);
-  const getExportData = useStore((s) => s.getExportData);
-  const importData = useStore((s) => s.importData);
+  const { activeTab, language, setActiveTab, setLanguage, resetAll, getExportData, importData } = useStore(
+    useShallow((state) => ({
+      activeTab: state.activeTab,
+      language: state.language,
+      setActiveTab: state.setActiveTab,
+      setLanguage: state.setLanguage,
+      resetAll: state.resetAll,
+      getExportData: state.getExportData,
+      importData: state.importData,
+    })),
+  );
 
   const [showReset, setShowReset] = useState(false);
+  const ActiveTabComponent = TAB_COMPONENTS[activeTab];
+
+  const handleLanguageChange = (nextLanguage: Language) => {
+    if (nextLanguage === language) return;
+    startTransition(() => setLanguage(nextLanguage));
+  };
+
+  const handleTabChange = (tab: Tab) => {
+    if (tab === activeTab) return;
+    startTransition(() => setActiveTab(tab));
+  };
 
   /* ── Export ── */
   const handleExport = () => {
@@ -74,7 +100,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
+    <>
+      <a href="#main-content" className="skip-link">
+        {tr(language, 'skipToContent')}
+      </a>
+      <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-5xl mx-auto">
         {/* ── Header ── */}
         <header className="mb-6 space-y-4">
@@ -86,16 +116,20 @@ export default function App() {
             <SubmitResultsButton />
             <div className="flex border border-aion-border rounded-lg overflow-hidden">
               <button
-                onClick={() => setLanguage('uk')}
-                className={`px-2.5 py-1.5 text-xs transition ${
+                type="button"
+                onClick={() => handleLanguageChange('uk')}
+                aria-pressed={language === 'uk'}
+                className={`px-2.5 py-1.5 text-xs transition-colors focus-visible:relative focus-visible:z-10 ${
                   language === 'uk' ? 'bg-aion-row text-aion-gold' : 'text-aion-muted hover:bg-white/5'
                 }`}
               >
                 UA
               </button>
               <button
-                onClick={() => setLanguage('en')}
-                className={`px-2.5 py-1.5 text-xs transition ${
+                type="button"
+                onClick={() => handleLanguageChange('en')}
+                aria-pressed={language === 'en'}
+                className={`px-2.5 py-1.5 text-xs transition-colors focus-visible:relative focus-visible:z-10 ${
                   language === 'en' ? 'bg-aion-row text-aion-gold' : 'text-aion-muted hover:bg-white/5'
                 }`}
               >
@@ -103,20 +137,23 @@ export default function App() {
               </button>
             </div>
             <button
+              type="button"
               onClick={handleExport}
-              className="px-3 py-1.5 rounded-lg border border-aion-gold text-aion-gold text-sm hover:bg-aion-gold/10 transition"
+              className="px-3 py-1.5 rounded-lg border border-aion-gold text-aion-gold text-sm hover:bg-aion-gold/10 transition-colors"
             >
               📤 {tr(language, 'export')}
             </button>
             <button
+              type="button"
               onClick={handleImport}
-              className="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 text-sm hover:bg-blue-400/10 transition"
+              className="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 text-sm hover:bg-blue-400/10 transition-colors"
             >
               📥 {tr(language, 'import')}
             </button>
             <button
+              type="button"
               onClick={() => setShowReset(true)}
-              className="px-3 py-1.5 rounded-lg border border-aion-danger text-aion-danger text-sm whitespace-nowrap hover:bg-aion-danger/10 transition"
+              className="px-3 py-1.5 rounded-lg border border-aion-danger text-aion-danger text-sm whitespace-nowrap hover:bg-aion-danger/10 transition-colors"
             >
               🗑️ {tr(language, 'reset')}
             </button>
@@ -124,31 +161,30 @@ export default function App() {
         </header>
 
         {/* ── Tab Navigation ── */}
-        <nav className="flex gap-1 mb-6 bg-aion-card rounded-xl p-1 overflow-x-auto border border-aion-border">
+        <nav aria-label="Primary" className="flex gap-1 mb-6 bg-aion-card rounded-xl p-1 overflow-x-auto border border-aion-border">
           {TABS.map((tab) => (
             <button
+              type="button"
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-w-[100px] px-4 py-2.5 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+              onClick={() => handleTabChange(tab.key)}
+              aria-pressed={activeTab === tab.key}
+              className={`flex-1 min-w-[100px] px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === tab.key
                   ? 'bg-aion-row text-aion-gold shadow-lg'
                   : 'text-aion-muted hover:text-aion-text hover:bg-white/5'
               }`}
             >
-              <span className="mr-1.5">{tab.icon}</span>
+              <span aria-hidden="true" className="mr-1.5">{tab.icon}</span>
               {tr(language, tab.labelKey)}
             </button>
           ))}
         </nav>
 
         {/* ── Content ── */}
-        <main className="bg-aion-card border border-aion-border rounded-xl p-4 md:p-6">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'global' && <GlobalDashboard />}
-          {activeTab === 'feathers' && <FeathersTracker />}
-          {activeTab === 'accessories' && <AccessoriesTracker />}
-          {activeTab === 'gear' && <GearTracker />}
-          {activeTab === 'calculator' && <FeatherPriceCalculator />}
+        <main id="main-content" className="bg-aion-card border border-aion-border rounded-xl p-4 md:p-6" tabIndex={-1}>
+          <Suspense fallback={<div aria-live="polite" className="py-8 text-center text-sm text-aion-muted">Loading tab…</div>}>
+            <ActiveTabComponent />
+          </Suspense>
         </main>
 
         {/* ── Footer ── */}
@@ -170,6 +206,7 @@ export default function App() {
         }}
         onCancel={() => setShowReset(false)}
       />
-    </div>
+      </div>
+    </>
   );
 }

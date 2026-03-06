@@ -58,16 +58,18 @@ export function AccessoriesTracker() {
                 {/* Action buttons */}
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     disabled={!hasPre}
                     onClick={() => recordAttempt(level, 'success')}
-                    className="px-3 py-1.5 rounded border border-aion-success text-aion-success text-sm bg-aion-success/10 hover:bg-aion-success/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    className="px-3 py-1.5 rounded border border-aion-success text-aion-success text-sm bg-aion-success/10 hover:bg-aion-success/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     {tr(lang, 'successBtn')}
                   </button>
                   <button
+                    type="button"
                     disabled={!hasPre}
                     onClick={() => recordAttempt(level, 'fail')}
-                    className="px-3 py-1.5 rounded border border-aion-danger text-aion-danger text-sm bg-aion-danger/10 hover:bg-aion-danger/20 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    className="px-3 py-1.5 rounded border border-aion-danger text-aion-danger text-sm bg-aion-danger/10 hover:bg-aion-danger/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     {tr(lang, 'failBtn')}
                   </button>

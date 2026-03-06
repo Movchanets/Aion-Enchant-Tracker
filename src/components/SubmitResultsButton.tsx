@@ -100,11 +100,13 @@ export function SubmitResultsButton() {
 
   return (
     <button
+      type="button"
+      aria-busy={syncing}
       onClick={handleSubmit}
       disabled={totalUnsynced === 0 || syncing}
-      className="px-3 py-1.5 rounded-lg border border-emerald-400 text-emerald-300 text-sm hover:bg-emerald-400/10 disabled:opacity-40 disabled:cursor-not-allowed transition"
+      className="px-3 py-1.5 rounded-lg border border-emerald-400 text-emerald-300 text-sm hover:bg-emerald-400/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
     >
-      {syncing ? 'Syncing...' : `Submit Results (${totalUnsynced})`}
+      <span aria-live="polite">{syncing ? 'Syncing…' : `Submit Results (${totalUnsynced})`}</span>
     </button>
   );
 }

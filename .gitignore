@@ -4,3 +4,5 @@ dist
 *.local
 .env
 .vscode
+.agents
+skills-lock.json

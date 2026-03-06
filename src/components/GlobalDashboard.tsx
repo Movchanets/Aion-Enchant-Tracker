@@ -455,15 +455,16 @@ export function GlobalDashboard() {
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-aion-gold">Global Dashboard</h2>
         <button
+          type="button"
           onClick={handleRefresh}
-          className="px-3 py-1.5 rounded-lg border border-aion-border text-aion-muted text-sm hover:bg-white/5 transition"
+          className="px-3 py-1.5 rounded-lg border border-aion-border text-aion-muted text-sm hover:bg-white/5 transition-colors"
         >
           Refresh
         </button>
       </div>
 
-      {isLoading && <p className="text-sm text-aion-muted">Loading community stats...</p>}
-      {error && <p className="text-sm text-aion-danger">{error}</p>}
+      {isLoading && <p aria-live="polite" className="text-sm text-aion-muted">Loading community stats…</p>}
+      {error && <p aria-live="polite" className="text-sm text-aion-danger">{error}</p>}
 
       <section className="bg-aion-row border border-aion-border rounded-lg p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -474,9 +475,10 @@ export function GlobalDashboard() {
           <label className="text-xs text-aion-muted">
             Scope
             <select
+              name="userScope"
               value={userScope}
               onChange={(e) => setUserScope(e.target.value as 'all' | 'current' | 'nickname')}
-              className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+              className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
             >
               <option value="all">All users</option>
               <option value="current">Current user</option>
@@ -488,9 +490,10 @@ export function GlobalDashboard() {
             <label className="text-xs text-aion-muted">
               Discord user
               <select
+                name="discordUser"
                 value={effectiveNicknameUserId}
                 onChange={(e) => setSelectedNicknameUserId(e.target.value)}
-                className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+                className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
               >
                 {availableUsers.length === 0 && <option value="">No users found</option>}
                 {availableUsers.map((u) => (
@@ -576,6 +579,7 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Item Level
                 <select
+                  name="gearItemLevelFilter"
                   value={activeGearItemLevel}
                   onChange={(e) => {
                     const nextLevel = Number(e.target.value);
@@ -585,7 +589,7 @@ export function GlobalDashboard() {
                     const nextStone = gear.find((r) => r.item_level === nextLevel && r.item_grade === (nextGrade ?? activeGearGrade))?.stone_level;
                     if (nextStone) setSelectedGearStoneLevel(String(nextStone));
                   }}
-                  className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+                  className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
                 >
                   {gearItemLevels.map((lvl) => (
                     <option key={lvl} value={lvl}>
@@ -598,6 +602,7 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Item Quality
                 <select
+                  name="gearGradeFilter"
                   value={activeGearGrade}
                   onChange={(e) => {
                     const nextGrade = e.target.value as ItemQuality;
@@ -605,7 +610,7 @@ export function GlobalDashboard() {
                     const nextStone = gear.find((r) => r.item_level === activeGearItemLevel && r.item_grade === nextGrade)?.stone_level;
                     if (nextStone) setSelectedGearStoneLevel(String(nextStone));
                   }}
-                  className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+                  className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
                 >
                   {gearGrades.map((grade) => (
                     <option key={grade} value={grade}>
@@ -618,9 +623,10 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Stone Level
                 <select
+                  name="gearStoneLevelFilter"
                   value={activeGearStoneLevel}
                   onChange={(e) => setSelectedGearStoneLevel(e.target.value)}
-                  className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+                  className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
                 >
                   {(gearStoneLevels.length > 0 ? gearStoneLevels : ALL_STONE_LEVELS.map(String)).map((stone) => (
                     <option key={stone} value={stone}>
@@ -633,9 +639,10 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Supplement
                 <select
+                  name="gearSupplementFilter"
                   value={activeGearSupplement}
                   onChange={(e) => setSelectedGearSupplement(e.target.value as SupplementTier | 'all')}
-                  className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+                  className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
                 >
                   <option value="all">All supplements</option>
                   {(gearSupplements.length > 0 ? gearSupplements : ALL_SUPPLEMENTS).map((supplement) => (
@@ -649,12 +656,13 @@ export function GlobalDashboard() {
               <label className="text-xs text-aion-muted">
                 Enchant Level
                 <select
+                  name="gearEnchantLevelFilter"
                   value={selectedGearEnchantLevel}
                   onChange={(e) => {
                     const value = e.target.value;
                     setSelectedGearEnchantLevel(value === 'all' ? 'all' : Number(value));
                   }}
-                  className="mt-1 w-full bg-aion-bg/70 border border-aion-border rounded px-2 py-1.5 outline-none focus:border-aion-gold"
+                  className="mt-1 w-full bg-aion-bg/70 text-aion-text border border-aion-border rounded px-2 py-1.5 transition-colors focus-visible:border-aion-gold"
                 >
                   <option value="all">All levels</option>
                   {Array.from({ length: 15 }, (_, i) => i + 1).map((lvl) => (

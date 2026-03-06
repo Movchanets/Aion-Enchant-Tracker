@@ -3,7 +3,8 @@ import type { Language } from './types';
 type Dict = Record<string, { uk: string; en: string }>;
 
 const DICT: Dict = {
-  appTitle: { uk: 'Riftshade: Трекер заточки ', en: 'Riftshade: Enchant Tracker' },
+  appTitle: { uk: 'Riftshade: Трекер заточки', en: 'Riftshade: Enchant Tracker' },
+  skipToContent: { uk: 'Перейти до основного вмісту', en: 'Skip to main content' },
   export: { uk: 'Експорт', en: 'Export' },
   import: { uk: 'Імпорт', en: 'Import' },
   reset: { uk: 'Скинути', en: 'Reset' },
@@ -65,8 +66,8 @@ const DICT: Dict = {
 
   calculatorTitle: { uk: 'Калькулятор ціни пера', en: 'Feather price calculator' },
   calculatorHint: {
-    uk: 'Розрахунок використовує шанси з вкладки Пера для кожного кроку (+0→+1, +1→+2...).',
-    en: 'This calculation uses chances from the Feathers tab for each step (+0→+1, +1→+2...).',
+    uk: 'Розрахунок використовує шанси з вкладки Пера для кожного кроку (+0→+1, +1→+2…).',
+    en: 'This calculation uses chances from the Feathers tab for each step (+0→+1, +1→+2…).',
   },
   calculatorHintGlobal: {
     uk: 'Розрахунок використовує глобальні шанси (з бази всіх гравців) для кожного кроку.',
@@ -75,7 +76,7 @@ const DICT: Dict = {
   statsSource: { uk: 'Джерело шансів', en: 'Chance source' },
   localStats: { uk: 'Локальна', en: 'Local' },
   globalStats: { uk: 'Глобальна', en: 'Global' },
-  loadingGlobalStats: { uk: 'Завантаження глобальних даних...', en: 'Loading global data...' },
+  loadingGlobalStats: { uk: 'Завантаження глобальних даних…', en: 'Loading global data…' },
   globalStatsError: { uk: 'Помилка завантаження глобальних шансів', en: 'Failed to load global chances' },
   missingStepDataGlobal: {
     uk: 'Відсутня глобальна статистика для деяких кроків до цільового рівня.',

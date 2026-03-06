@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store/useStore';
 import { FEATHER_MAX, ACCESSORY_MAX, getChance, getTotal, type AttemptRecord } from '../types';
 import { tr } from '../i18n';
@@ -36,10 +38,14 @@ function TrackerCard({ title, icon, data, lang }: { title: string; icon: string;
 /* ── Dashboard ── */
 
 export function Dashboard() {
-  const lang = useStore((s) => s.language);
-  const feathers = useStore((s) => s.feathers);
-  const accessories = useStore((s) => s.accessories);
-  const gear = useStore((s) => s.gear);
+  const { lang, featherStats, accessoryStats, gearStats } = useStore(
+    useShallow((state) => ({
+      lang: state.language,
+      featherStats: state.feathers.stats,
+      accessoryStats: state.accessories.stats,
+      gearStats: state.gear.stats,
+    })),
+  );
 
   const aggregate = (stats: Record<number, AttemptRecord>, max: number): AttemptRecord => {
     let success = 0;
@@ -51,21 +57,34 @@ export function Dashboard() {
     return { success, fail };
   };
 
-  const featherTotals = aggregate(feathers.stats, FEATHER_MAX);
-  const accessoryTotals = aggregate(accessories.stats, ACCESSORY_MAX);
+  const { featherTotals, accessoryTotals, gearTotals, hasAnyData } = useMemo(() => {
+    const nextFeatherTotals = aggregate(featherStats, FEATHER_MAX);
+    const nextAccessoryTotals = aggregate(accessoryStats, ACCESSORY_MAX);
+    const nextGearTotals: AttemptRecord = { success: 0, fail: 0 };
 
-  const gearTotals: AttemptRecord = { success: 0, fail: 0 };
-  for (const q of Object.values(gear.stats)) {
-    for (const s of Object.values(q)) {
-      for (const r of Object.values(s)) {
-        gearTotals.success += r.success;
-        gearTotals.fail += r.fail;
+    for (const qualityStats of Object.values(gearStats)) {
+      for (const stoneStats of Object.values(qualityStats)) {
+        for (const record of Object.values(stoneStats)) {
+          nextGearTotals.success += record.success;
+          nextGearTotals.fail += record.fail;
+        }
       }
     }
-  }
 
-  const hasAnyData =
-    featherTotals.success + featherTotals.fail + accessoryTotals.success + accessoryTotals.fail + gearTotals.success + gearTotals.fail > 0;
+    return {
+      featherTotals: nextFeatherTotals,
+      accessoryTotals: nextAccessoryTotals,
+      gearTotals: nextGearTotals,
+      hasAnyData:
+        nextFeatherTotals.success +
+          nextFeatherTotals.fail +
+          nextAccessoryTotals.success +
+          nextAccessoryTotals.fail +
+          nextGearTotals.success +
+          nextGearTotals.fail >
+        0,
+    };
+  }, [featherStats, accessoryStats, gearStats]);
 
   return (
     <div className="space-y-6">
@@ -82,7 +101,7 @@ export function Dashboard() {
         <h3 className="text-lg font-bold text-aion-gold mb-3">🪶 {tr(lang, 'featherChancesByStep')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-sm">
           {Array.from({ length: FEATHER_MAX }, (_, i) => i + 1).map((step) => {
-            const rec = feathers.stats[step] ?? { success: 0, fail: 0 };
+            const rec = featherStats[step] ?? { success: 0, fail: 0 };
             const total = rec.success + rec.fail;
             const chance = total > 0 ? `${((rec.success / total) * 100).toFixed(1)}%` : '—';
             return (
